@@ -2,7 +2,7 @@
 mod tests {
     use aphelion_core::backend::NullBackend;
     use aphelion_core::config::ModelConfig;
-    use aphelion_core::diagnostics::{InMemoryTraceSink, TraceSink};
+    use aphelion_core::diagnostics::{InMemoryTraceSink, TraceLevel, TraceSink};
     use aphelion_core::graph::BuildGraph;
     use aphelion_core::pipeline::{BuildContext, BuildPipeline};
     use aphelion_core::aphelion_model;
@@ -68,6 +68,9 @@ mod tests {
             id: "test.event".to_string(),
             message: "hello".to_string(),
             timestamp: std::time::SystemTime::now(),
+            level: TraceLevel::Info,
+            span_id: None,
+            trace_id: None,
         });
         assert_eq!(trace.events().len(), 1);
     }
