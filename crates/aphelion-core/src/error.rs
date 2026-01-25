@@ -90,27 +90,95 @@ impl From<io::Error> for AphelionError {
 pub type AphelionResult<T> = Result<T, AphelionError>;
 
 impl AphelionError {
-    /// Create a validation error with a custom message
+    /// Creates a validation error with a custom message.
+    ///
+    /// # Arguments
+    ///
+    /// * `msg` - Error message (converted to String)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::error::AphelionError;
+    ///
+    /// let error = AphelionError::validation("field 'name' is required");
+    /// assert_eq!(error.message(), "field 'name' is required");
+    /// ```
     pub fn validation(msg: impl Into<String>) -> Self {
         AphelionError::Validation(msg.into())
     }
 
-    /// Create a serialization error with a custom message
+    /// Creates a serialization error with a custom message.
+    ///
+    /// # Arguments
+    ///
+    /// * `msg` - Error message (converted to String)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::error::AphelionError;
+    ///
+    /// let error = AphelionError::serialization("failed to serialize JSON");
+    /// assert!(error.to_string().contains("serialization"));
+    /// ```
     pub fn serialization(msg: impl Into<String>) -> Self {
         AphelionError::Serialization(msg.into())
     }
 
-    /// Create an IO error with a custom message
+    /// Creates an I/O error with a custom message.
+    ///
+    /// # Arguments
+    ///
+    /// * `msg` - Error message (converted to String)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::error::AphelionError;
+    ///
+    /// let error = AphelionError::io("file not found");
+    /// assert_eq!(error.message(), "file not found");
+    /// ```
     pub fn io(msg: impl Into<String>) -> Self {
         AphelionError::Io(msg.into())
     }
 
-    /// Create a graph error with a custom message
+    /// Creates a graph error with a custom message.
+    ///
+    /// # Arguments
+    ///
+    /// * `msg` - Error message (converted to String)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::error::AphelionError;
+    ///
+    /// let error = AphelionError::graph("cycle detected in graph");
+    /// assert_eq!(error.message(), "cycle detected in graph");
+    /// ```
     pub fn graph(msg: impl Into<String>) -> Self {
         AphelionError::Graph(msg.into())
     }
 
-    /// Get a string reference to the error message
+    /// Extracts a string reference to the error message.
+    ///
+    /// This method provides direct access to the error message without formatting,
+    /// useful for error handling and custom error display logic.
+    ///
+    /// # Returns
+    ///
+    /// A `&str` containing the error message for any `AphelionError` variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::error::AphelionError;
+    ///
+    /// let error = AphelionError::Build("compilation failed".to_string());
+    /// assert_eq!(error.message(), "compilation failed");
+    /// ```
     pub fn message(&self) -> &str {
         match self {
             AphelionError::InvalidConfig(msg) => msg,

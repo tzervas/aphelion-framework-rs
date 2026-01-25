@@ -1,41 +1,178 @@
+//! Graph construction and manipulation for model architectures.
+//!
+//! This module provides types and algorithms for building directed acyclic graphs (DAGs)
+//! representing model architectures. Graphs support cycle detection, topological sorting,
+//! stable hashing, and DOT format export for visualization.
+
 use crate::config::ModelConfig;
 use crate::error::AphelionError;
 use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
+/// Unique identifier for a graph node.
+///
+/// `NodeId` is a thin wrapper around `u64` that provides type safety and clarity.
+/// It implements `Copy`, `Hash`, and `Ord` to enable efficient use in collections
+/// and graph algorithms.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::graph::NodeId;
+///
+/// let id1 = NodeId::new(1);
+/// let id2 = NodeId::new(2);
+/// assert_eq!(id1.value(), 1);
+/// assert_ne!(id1, id2);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct NodeId(u64);
 
 impl NodeId {
+    /// Creates a new `NodeId` with the given value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The unique identifier value
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::graph::NodeId;
+    ///
+    /// let id = NodeId::new(42);
+    /// assert_eq!(id.value(), 42);
+    /// ```
     pub fn new(value: u64) -> Self {
         Self(value)
     }
 
+    /// Extracts the numeric value from this `NodeId`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::graph::NodeId;
+    ///
+    /// let id = NodeId::new(123);
+    /// assert_eq!(id.value(), 123);
+    /// ```
     pub fn value(self) -> u64 {
         self.0
     }
 }
 
+/// A node in the computation graph.
+///
+/// `GraphNode` represents a single layer, operation, or model component in a computation graph.
+/// Each node contains a unique identifier, name, configuration, and optional metadata.
+///
+/// # Fields
+///
+/// * `id` - Unique node identifier
+/// * `name` - Human-readable node name (e.g., "embedding_layer", "attention")
+/// * `config` - Model configuration for this node
+/// * `metadata` - Additional metadata stored as JSON values
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::graph::{GraphNode, NodeId};
+/// use aphelion_core::config::ModelConfig;
+///
+/// let config = ModelConfig::new("layer", "1.0.0");
+/// let node = GraphNode {
+///     id: NodeId::new(1),
+///     name: "embedding".to_string(),
+///     config,
+///     metadata: std::collections::HashMap::new(),
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphNode {
+    /// Unique node identifier
     pub id: NodeId,
+    /// Human-readable node name
     pub name: String,
+    /// Model configuration for this node
     pub config: ModelConfig,
+    /// Additional metadata as JSON values
     pub metadata: HashMap<String, serde_json::Value>,
 }
 
 impl GraphNode {
-    /// Add or update metadata for this node.
+    /// Adds or updates metadata for this node.
+    ///
+    /// Uses the builder pattern to allow chaining multiple metadata assignments.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Metadata key
+    /// * `value` - Metadata value as a JSON value
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::graph::{GraphNode, NodeId};
+    /// use aphelion_core::config::ModelConfig;
+    ///
+    /// let config = ModelConfig::new("layer", "1.0.0");
+    /// let node = GraphNode {
+    ///     id: NodeId::new(1),
+    ///     name: "dense".to_string(),
+    ///     config,
+    ///     metadata: std::collections::HashMap::new(),
+    /// }.with_metadata("units", serde_json::json!(256))
+    ///  .with_metadata("activation", serde_json::json!("relu"));
+    ///
+    /// assert_eq!(node.metadata.len(), 2);
+    /// ```
     pub fn with_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.metadata.insert(key.into(), value);
         self
     }
 }
 
+/// A directed acyclic graph (DAG) representing a model architecture.
+///
+/// `BuildGraph` stores the nodes and edges of a computation graph, enabling operations
+/// such as cycle detection, topological sorting, hashing, and DOT format export.
+/// All graphs are validated to be acyclic to support deterministic execution.
+///
+/// # Fields
+///
+/// * `nodes` - Vector of graph nodes
+/// * `edges` - Vector of edges represented as (from_id, to_id) tuples
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::graph::BuildGraph;
+/// use aphelion_core::config::ModelConfig;
+///
+/// let mut graph = BuildGraph::default();
+/// let config = ModelConfig::new("model", "1.0.0");
+///
+/// let node1 = graph.add_node("input", config.clone());
+/// let node2 = graph.add_node("hidden", config.clone());
+/// let node3 = graph.add_node("output", config);
+///
+/// graph.add_edge(node1, node2);
+/// graph.add_edge(node2, node3);
+///
+/// // Verify no cycles
+/// assert!(!graph.has_cycle());
+///
+/// // Get topological order
+/// let topo = graph.topological_sort().expect("valid DAG");
+/// assert_eq!(topo.len(), 3);
+/// ```
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct BuildGraph {
+    /// All nodes in the graph
     pub nodes: Vec<GraphNode>,
+    /// All edges as (from, to) node ID pairs
     pub edges: Vec<(NodeId, NodeId)>,
 }
 

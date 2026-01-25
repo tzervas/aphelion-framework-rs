@@ -122,11 +122,6 @@ fn is_model_config(ty: &Type) -> bool {
     }
 }
 
-/// Check if a struct has any generic parameters
-fn has_generics(generics: &Generics) -> bool {
-    !generics.params.is_empty()
-}
-
 fn expand_model_struct(item_struct: ItemStruct) -> proc_macro2::TokenStream {
     let name = &item_struct.ident;
     let generics: &Generics = &item_struct.generics;
