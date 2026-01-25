@@ -44,8 +44,8 @@ Each criterion is **test-backed** where possible and **documented**.
 - **Docs**: Burn backend requirements in [docs/spec.md](docs/spec.md)
 
 ## 4) Compliance Checklist
-- [ ] SC-1 pass + documented
-- [ ] SC-2 pass + documented
-- [ ] SC-3 pass + documented
-- [ ] SC-4 pass + documented
-- [ ] SC-5 pass + documented
+- [x] SC-1 pass + documented
+- [x] SC-2 pass + documented
+- [x] SC-3 pass + documented
+- [x] SC-4 pass + documented
+- [x] SC-5 pass + documented

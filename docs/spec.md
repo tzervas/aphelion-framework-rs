@@ -49,15 +49,15 @@ This document expands the canonical spec in [SPEC.md](../SPEC.md).
 - **Docs**: non-empty name/version rules; extendable later.
 
 ### SC-3: Trace capture works
-- **Test**: `trace_sink_records_events` (to be implemented).
+- **Test**: `trace_sink_records_events` ✓ implemented
 - **Docs**: trace schema and ordering guarantees.
 
 ### SC-4: Macro ergonomic contract
-- **Test**: `macro_build_graph_convention` (to be implemented).
+- **Test**: `macro_build_graph_convention` ✓ implemented
 - **Docs**: `config` field + `build_graph` method required.
 
 ### SC-5: Burn-first backend availability
-- **Test**: `burn_backend_config_defaults` (to be implemented).
+- **Test**: `burn_backend_config_defaults` ✓ implemented
 - **Docs**: `BurnBackendConfig` must include device + perf toggles.
 
 ## 4) Future Extensions

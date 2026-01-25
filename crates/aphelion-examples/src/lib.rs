@@ -1,7 +1,22 @@
+//! Aphelion Framework Examples
+//!
+//! This crate provides comprehensive examples demonstrating the usage of the aphelion-core framework.
+//! Each example focuses on a specific aspect of the framework:
+//!
+//! - `basic_usage`: Simple model building with BuildGraph and BuildPipeline
+//! - `custom_backend`: Implementing custom Backend trait with device capabilities
+//! - `pipeline_stages`: Creating custom PipelineStage implementations and composition
+//! - `validation`: Using validators to ensure configuration correctness
+
+pub mod basic_usage;
+pub mod custom_backend;
+pub mod pipeline_stages;
+pub mod validation;
+
 use aphelion_core::aphelion_model;
 use aphelion_core::backend::{Backend, NullBackend};
 use aphelion_core::config::ModelConfig;
-use aphelion_core::diagnostics::{TraceEvent, TraceSink};
+use aphelion_core::diagnostics::{TraceEvent, TraceLevel, TraceSink};
 use aphelion_core::graph::BuildGraph;
 use aphelion_core::pipeline::{BuildContext, BuildPipeline};
 use std::time::SystemTime;
@@ -27,6 +42,9 @@ impl ToyModel {
             id: "toy_model.init".to_string(),
             message: format!("building with backend={} device={}", backend.name(), backend.device()),
             timestamp: SystemTime::now(),
+            level: TraceLevel::Info,
+            span_id: None,
+            trace_id: None,
         });
 
         let mut graph = BuildGraph::default();
@@ -37,6 +55,9 @@ impl ToyModel {
             id: "toy_model.graph".to_string(),
             message: format!("graph_hash={}", graph.stable_hash()),
             timestamp: SystemTime::now(),
+            level: TraceLevel::Info,
+            span_id: None,
+            trace_id: None,
         });
 
         graph
