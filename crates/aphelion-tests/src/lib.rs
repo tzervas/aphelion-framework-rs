@@ -265,8 +265,8 @@ mod tests {
                 _ctx: &aphelion_core::pipeline::BuildContext,
                 _graph: &mut BuildGraph,
             ) -> aphelion_core::error::AphelionResult<()> {
-                Err(aphelion_core::error::AphelionError::Build(
-                    "Stage failed as expected".to_string(),
+                Err(aphelion_core::error::AphelionError::build(
+                    "Stage failed as expected",
                 ))
             }
         }
@@ -749,5 +749,254 @@ mod tests {
         let graph = BuildGraph::default();
         let result = pipeline.execute(&ctx, graph);
         assert!(result.is_ok());
+    }
+
+    // ============================================================================
+    // ASYNC PIPELINE TESTS (SC-13)
+    // ============================================================================
+
+    #[cfg(feature = "tokio")]
+    #[tokio::test]
+    async fn async_pipeline_executes() {
+        use aphelion_core::pipeline::AsyncPipelineStage;
+
+        // Test async pipeline execution with async stages
+        struct AsyncCountingStage {
+            name: String,
+            counter: Arc<Mutex<usize>>,
+        }
+
+        impl AsyncCountingStage {
+            fn new(name: &str, counter: Arc<Mutex<usize>>) -> Self {
+                Self {
+                    name: name.to_string(),
+                    counter,
+                }
+            }
+        }
+
+        impl AsyncPipelineStage for AsyncCountingStage {
+            fn name(&self) -> &str {
+                &self.name
+            }
+
+            fn execute_async<'a>(
+                &'a self,
+                _ctx: &'a BuildContext<'_>,
+                _graph: &'a mut BuildGraph,
+            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>> + Send + 'a>> {
+                let counter = Arc::clone(&self.counter);
+                Box::pin(async move {
+                    // Simulate async work
+                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                    let mut c = counter.lock().unwrap();
+                    *c += 1;
+                    Ok(())
+                })
+            }
+        }
+
+        let counter = Arc::new(Mutex::new(0));
+
+        let stage1 = Box::new(AsyncCountingStage::new("async_stage1", Arc::clone(&counter)));
+        let stage2 = Box::new(AsyncCountingStage::new("async_stage2", Arc::clone(&counter)));
+        let stage3 = Box::new(AsyncCountingStage::new("async_stage3", Arc::clone(&counter)));
+
+        let pipeline = BuildPipeline::new()
+            .with_async_stage(stage1)
+            .with_async_stage(stage2)
+            .with_async_stage(stage3);
+
+        let backend = NullBackend::cpu();
+        let trace = InMemoryTraceSink::new();
+        let ctx = BuildContext {
+            backend: &backend,
+            trace: &trace,
+        };
+
+        let graph = BuildGraph::default();
+        let result = pipeline.execute_async(&ctx, graph).await;
+
+        assert!(result.is_ok(), "Async pipeline should execute successfully");
+        assert_eq!(*counter.lock().unwrap(), 3, "All three async stages should execute");
+    }
+
+    #[cfg(feature = "tokio")]
+    #[tokio::test]
+    async fn async_pipeline_with_builtin_stages() {
+        use aphelion_core::pipeline::{ValidationStage, HashingStage};
+
+        // Test async pipeline with built-in stages that implement AsyncPipelineStage
+        let mut graph = BuildGraph::default();
+        let config = ModelConfig::new("async-test", "1.0.0");
+        graph.add_node("test_node", config);
+
+        let pipeline = BuildPipeline::new()
+            .with_async_stage(Box::new(ValidationStage))
+            .with_async_stage(Box::new(HashingStage));
+
+        let backend = NullBackend::cpu();
+        let trace = InMemoryTraceSink::new();
+        let ctx = BuildContext {
+            backend: &backend,
+            trace: &trace,
+        };
+
+        let result = pipeline.execute_async(&ctx, graph).await;
+
+        assert!(result.is_ok(), "Async pipeline with validation and hashing should succeed");
+
+        let events = trace.events();
+        assert!(events.iter().any(|e| e.message.contains("validated 1 nodes")));
+        assert!(events.iter().any(|e| e.message.contains("computed graph hash")));
+    }
+
+    #[cfg(feature = "tokio")]
+    #[tokio::test]
+    async fn async_pipeline_error_propagation() {
+        use aphelion_core::pipeline::AsyncPipelineStage;
+
+        // Test error propagation in async pipeline
+        struct FailingAsyncStage;
+
+        impl AsyncPipelineStage for FailingAsyncStage {
+            fn name(&self) -> &str {
+                "failing_async"
+            }
+
+            fn execute_async<'a>(
+                &'a self,
+                _ctx: &'a BuildContext<'_>,
+                _graph: &'a mut BuildGraph,
+            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>> + Send + 'a>> {
+                Box::pin(async move {
+                    Err(aphelion_core::error::AphelionError::build(
+                        "Async stage failed as expected",
+                    ))
+                })
+            }
+        }
+
+        let counter = Arc::new(Mutex::new(0));
+
+        struct AsyncCountingStage {
+            counter: Arc<Mutex<usize>>,
+        }
+
+        impl AsyncPipelineStage for AsyncCountingStage {
+            fn name(&self) -> &str {
+                "async_counting"
+            }
+
+            fn execute_async<'a>(
+                &'a self,
+                _ctx: &'a BuildContext<'_>,
+                _graph: &'a mut BuildGraph,
+            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>> + Send + 'a>> {
+                let counter = Arc::clone(&self.counter);
+                Box::pin(async move {
+                    let mut c = counter.lock().unwrap();
+                    *c += 1;
+                    Ok(())
+                })
+            }
+        }
+
+        let stage_before = Box::new(AsyncCountingStage {
+            counter: Arc::clone(&counter),
+        });
+        let failing_stage = Box::new(FailingAsyncStage);
+        let stage_after = Box::new(AsyncCountingStage {
+            counter: Arc::clone(&counter),
+        });
+
+        let pipeline = BuildPipeline::new()
+            .with_async_stage(stage_before)
+            .with_async_stage(failing_stage)
+            .with_async_stage(stage_after);
+
+        let backend = NullBackend::cpu();
+        let trace = InMemoryTraceSink::new();
+        let ctx = BuildContext {
+            backend: &backend,
+            trace: &trace,
+        };
+
+        let graph = BuildGraph::default();
+        let result = pipeline.execute_async(&ctx, graph).await;
+
+        assert!(result.is_err(), "Pipeline should propagate async error");
+        assert_eq!(
+            *counter.lock().unwrap(),
+            1,
+            "Only first stage should execute before async error"
+        );
+    }
+
+    #[cfg(feature = "tokio")]
+    #[tokio::test]
+    async fn async_pipeline_with_hooks() {
+        use aphelion_core::pipeline::AsyncPipelineStage;
+
+        // Test that pre and post hooks work with async pipeline
+        let execution_log = Arc::new(Mutex::new(Vec::new()));
+
+        let log_clone1 = Arc::clone(&execution_log);
+        let pre_hook = move |_ctx: &BuildContext| {
+            log_clone1.lock().unwrap().push("pre_hook".to_string());
+            Ok(())
+        };
+
+        let log_clone2 = Arc::clone(&execution_log);
+        let post_hook = move |_ctx: &BuildContext, _graph: &BuildGraph| {
+            log_clone2.lock().unwrap().push("post_hook".to_string());
+            Ok(())
+        };
+
+        struct LoggingAsyncStage {
+            log: Arc<Mutex<Vec<String>>>,
+        }
+
+        impl AsyncPipelineStage for LoggingAsyncStage {
+            fn name(&self) -> &str {
+                "async_stage"
+            }
+
+            fn execute_async<'a>(
+                &'a self,
+                _ctx: &'a BuildContext<'_>,
+                _graph: &'a mut BuildGraph,
+            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>> + Send + 'a>> {
+                let log = Arc::clone(&self.log);
+                Box::pin(async move {
+                    log.lock().unwrap().push("async_stage".to_string());
+                    Ok(())
+                })
+            }
+        }
+
+        let pipeline = BuildPipeline::new()
+            .with_pre_hook(pre_hook)
+            .with_async_stage(Box::new(LoggingAsyncStage {
+                log: Arc::clone(&execution_log),
+            }))
+            .with_post_hook(post_hook);
+
+        let backend = NullBackend::cpu();
+        let trace = InMemoryTraceSink::new();
+        let ctx = BuildContext {
+            backend: &backend,
+            trace: &trace,
+        };
+
+        let graph = BuildGraph::default();
+        let result = pipeline.execute_async(&ctx, graph).await;
+
+        assert!(result.is_ok());
+        let log = execution_log.lock().unwrap();
+        assert_eq!(log.len(), 3);
+        assert_eq!(log[0], "pre_hook", "Pre-hook should execute first");
+        assert_eq!(log[1], "async_stage", "Async stage should execute second");
+        assert_eq!(log[2], "post_hook", "Post-hook should execute last");
     }
 }

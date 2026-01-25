@@ -117,6 +117,66 @@ pub trait PipelineStage: Send + Sync {
     fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()>;
 }
 
+/// Trait for composable asynchronous pipeline stages.
+///
+/// `AsyncPipelineStage` defines the interface for asynchronous stages in a build pipeline.
+/// This trait is only available when the `tokio` feature is enabled.
+///
+/// # Implementing AsyncPipelineStage
+///
+/// Types implementing `AsyncPipelineStage` must be thread-safe (`Send + Sync`) and
+/// deterministic. The async execution should have the same behavior as sync stages.
+///
+/// # Examples
+///
+/// ```ignore
+/// use aphelion_core::pipeline::{AsyncPipelineStage, BuildContext};
+/// use aphelion_core::graph::BuildGraph;
+/// use aphelion_core::error::AphelionResult;
+/// use std::pin::Pin;
+/// use std::future::Future;
+///
+/// struct AsyncLoggingStage;
+///
+/// impl AsyncPipelineStage for AsyncLoggingStage {
+///     fn name(&self) -> &str {
+///         "async_logging"
+///     }
+///
+///     fn execute_async<'a>(
+///         &'a self,
+///         ctx: &'a BuildContext<'_>,
+///         graph: &'a mut BuildGraph,
+///     ) -> Pin<Box<dyn Future<Output = AphelionResult<()>> + Send + 'a>> {
+///         Box::pin(async move {
+///             // Async implementation here
+///             Ok(())
+///         })
+///     }
+/// }
+/// ```
+#[cfg(feature = "tokio")]
+pub trait AsyncPipelineStage: Send + Sync {
+    /// Returns the name of this stage for logging and identification.
+    fn name(&self) -> &str;
+
+    /// Executes this stage asynchronously with the given context and graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The build context with backend and trace sink
+    /// * `graph` - The computation graph being built
+    ///
+    /// # Errors
+    ///
+    /// Returns `AphelionResult::Err` if the stage fails.
+    fn execute_async<'a>(
+        &'a self,
+        ctx: &'a BuildContext<'_>,
+        graph: &'a mut BuildGraph,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = AphelionResult<()>> + Send + 'a>>;
+}
+
 /// Lifecycle hooks for pipeline execution.
 ///
 /// `PipelineHooks` allows registering callbacks that execute before and after
@@ -192,6 +252,8 @@ impl Default for PipelineHooks {
 /// ```
 pub struct BuildPipeline {
     stages: Vec<Box<dyn PipelineStage>>,
+    #[cfg(feature = "tokio")]
+    async_stages: Vec<Box<dyn AsyncPipelineStage>>,
     hooks: PipelineHooks,
     skip_stages: HashSet<String>,
     on_progress: Option<Box<dyn Fn(&str, usize, usize) + Send + Sync>>,
@@ -220,6 +282,8 @@ impl BuildPipeline {
     pub fn new() -> Self {
         Self {
             stages: Vec::new(),
+            #[cfg(feature = "tokio")]
+            async_stages: Vec::new(),
             hooks: PipelineHooks::default(),
             skip_stages: HashSet::new(),
             on_progress: None,
@@ -311,6 +375,29 @@ impl BuildPipeline {
     /// ```
     pub fn with_stage(mut self, stage: Box<dyn PipelineStage>) -> Self {
         self.stages.push(stage);
+        self
+    }
+
+    /// Adds an async stage to the pipeline.
+    ///
+    /// Async stages are only available when the `tokio` feature is enabled.
+    /// They are executed in the order they are added.
+    ///
+    /// # Arguments
+    ///
+    /// * `stage` - The async stage to add
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::new()
+    ///     .with_async_stage(Box::new(MyAsyncStage));
+    /// ```
+    #[cfg(feature = "tokio")]
+    pub fn with_async_stage(mut self, stage: Box<dyn AsyncPipelineStage>) -> Self {
+        self.async_stages.push(stage);
         self
     }
 
@@ -450,6 +537,86 @@ impl BuildPipeline {
 
             // Execute stage
             stage.execute(ctx, &mut graph)?;
+        }
+
+        // Execute post-build hooks
+        for hook in &self.hooks.post_build {
+            hook(ctx, &graph)?;
+        }
+
+        Ok(graph)
+    }
+
+    /// Executes the pipeline asynchronously with all configured async stages.
+    ///
+    /// This method is only available when the `tokio` feature is enabled.
+    /// Executes pre-build hooks, then all async stages in order (skipping as configured),
+    /// then post-build hooks. Returns the final graph if successful.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The build context
+    /// * `graph` - The initial computation graph
+    ///
+    /// # Returns
+    ///
+    /// The final graph after all stages, or an error if any stage fails
+    ///
+    /// # Errors
+    ///
+    /// Returns `AphelionResult::Err` if any hook or stage returns an error.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use aphelion_core::pipeline::{BuildPipeline, BuildContext};
+    /// use aphelion_core::graph::BuildGraph;
+    /// use aphelion_core::backend::NullBackend;
+    /// use aphelion_core::diagnostics::InMemoryTraceSink;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let pipeline = BuildPipeline::new();
+    ///     let backend = NullBackend::cpu();
+    ///     let trace = InMemoryTraceSink::new();
+    ///     let ctx = BuildContext { backend: &backend, trace: &trace };
+    ///     let graph = BuildGraph::default();
+    ///
+    ///     let result = pipeline.execute_async(&ctx, graph).await;
+    ///     assert!(result.is_ok());
+    /// }
+    /// ```
+    #[cfg(feature = "tokio")]
+    pub async fn execute_async(
+        &self,
+        ctx: &BuildContext<'_>,
+        mut graph: BuildGraph,
+    ) -> AphelionResult<BuildGraph> {
+        // Execute pre-build hooks
+        for hook in &self.hooks.pre_build {
+            hook(ctx)?;
+        }
+
+        // Execute async stages
+        let total_stages = self.async_stages.len();
+        for (index, stage) in self.async_stages.iter().enumerate() {
+            let stage_name = stage.name();
+
+            // Skip stage if it's in the skip list
+            if self.skip_stages.contains(stage_name) {
+                if let Some(ref progress) = self.on_progress {
+                    progress(&format!("{} (skipped)", stage_name), index + 1, total_stages);
+                }
+                continue;
+            }
+
+            // Report progress
+            if let Some(ref progress) = self.on_progress {
+                progress(stage_name, index + 1, total_stages);
+            }
+
+            // Execute async stage
+            stage.execute_async(ctx, &mut graph).await?;
         }
 
         // Execute post-build hooks
@@ -652,6 +819,48 @@ impl PipelineStage for HashingStage {
         });
 
         Ok(())
+    }
+}
+
+/// Async implementation for ValidationStage.
+///
+/// This allows ValidationStage to be used in async pipelines when the `tokio` feature is enabled.
+#[cfg(feature = "tokio")]
+impl AsyncPipelineStage for ValidationStage {
+    fn name(&self) -> &str {
+        "validation"
+    }
+
+    fn execute_async<'a>(
+        &'a self,
+        ctx: &'a BuildContext<'_>,
+        graph: &'a mut BuildGraph,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = AphelionResult<()>> + Send + 'a>> {
+        Box::pin(async move {
+            // Delegate to the synchronous implementation
+            self.execute(ctx, graph)
+        })
+    }
+}
+
+/// Async implementation for HashingStage.
+///
+/// This allows HashingStage to be used in async pipelines when the `tokio` feature is enabled.
+#[cfg(feature = "tokio")]
+impl AsyncPipelineStage for HashingStage {
+    fn name(&self) -> &str {
+        "hashing"
+    }
+
+    fn execute_async<'a>(
+        &'a self,
+        ctx: &'a BuildContext<'_>,
+        graph: &'a mut BuildGraph,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = AphelionResult<()>> + Send + 'a>> {
+        Box::pin(async move {
+            // Delegate to the synchronous implementation
+            self.execute(ctx, graph)
+        })
     }
 }
 
