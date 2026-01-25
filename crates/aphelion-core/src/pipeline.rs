@@ -5,7 +5,7 @@
 //! The pipeline architecture enables composable, reusable build processes.
 
 use crate::backend::{Backend, ModelBuilder};
-use crate::config::{ConfigSpec, ModelConfig};
+use crate::config::ConfigSpec;
 use crate::diagnostics::{TraceEvent, TraceLevel, TraceSink};
 use crate::error::{AphelionError, AphelionResult};
 use crate::graph::BuildGraph;
@@ -580,6 +580,7 @@ impl PipelineStage for HashingStage {
 mod tests {
     use super::*;
     use crate::backend::Backend;
+    use crate::config::ModelConfig;
     use crate::diagnostics::TraceSink;
     use std::sync::{Arc, Mutex};
 

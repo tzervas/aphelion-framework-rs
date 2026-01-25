@@ -59,7 +59,7 @@ impl PipelineStage for OptimizeGraphStage {
         "optimize_graph"
     }
 
-    fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()> {
+    fn execute(&self, ctx: &BuildContext, _graph: &mut BuildGraph) -> AphelionResult<()> {
         ctx.trace.record(TraceEvent {
             id: "stage.optimize".to_string(),
             message: "Optimizing graph for execution".to_string(),
@@ -106,6 +106,7 @@ impl MetadataStage {
         }
     }
 
+    #[cfg(test)]
     fn get_metadata_count(&self) -> usize {
         *self.metadata_added.lock().unwrap()
     }

@@ -11,11 +11,10 @@
 
 use aphelion_core::backend::{Backend, DeviceCapabilities};
 use aphelion_core::config::ModelConfig;
-use aphelion_core::diagnostics::{InMemoryTraceSink, TraceEvent, TraceLevel};
+use aphelion_core::diagnostics::InMemoryTraceSink;
 use aphelion_core::error::AphelionResult;
 use aphelion_core::graph::BuildGraph;
 use aphelion_core::pipeline::{BuildContext, BuildPipeline};
-use std::time::SystemTime;
 
 /// A custom GPU backend implementation with advanced capabilities.
 #[derive(Debug, Clone)]
