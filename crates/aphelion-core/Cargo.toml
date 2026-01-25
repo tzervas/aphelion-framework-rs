@@ -1,0 +1,27 @@
+[package]
+name = "aphelion-core"
+version = "0.1.0"
+edition = { workspace = true }
+license = { workspace = true }
+authors = { workspace = true }
+repository = { workspace = true }
+
+[features]
+default = []
+rust-ai-core = ["dep:rust-ai-core"]
+burn = ["dep:burn"]
+cubecl = ["dep:cubecl"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+rust-ai-core = { workspace = true, optional = true }
+burn = { workspace = true, optional = true }
+cubecl = { workspace = true, optional = true }
+
+aphelion-macros = { path = "../aphelion-macros" }
