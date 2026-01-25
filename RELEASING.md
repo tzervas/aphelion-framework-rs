@@ -14,7 +14,7 @@ Configure the following secrets in your GitHub repository settings:
    - Add as repository secret: Settings → Secrets and variables → Actions → New repository secret
 
 2. **PyPI Trusted Publishing** (recommended)
-   - Go to [pypi.org/manage/project/aphelion/settings/publishing/](https://pypi.org/manage/project/aphelion/settings/publishing/)
+   - Go to [pypi.org/manage/project/aphelion-framework/settings/publishing/](https://pypi.org/manage/project/aphelion-framework/settings/publishing/)
    - Add a new trusted publisher:
      - Owner: `tzervas`
      - Repository: `aphelion-framework-rs`
@@ -23,7 +23,7 @@ Configure the following secrets in your GitHub repository settings:
 
    Or use **PYPI_API_TOKEN**:
    - Go to [pypi.org/manage/account/token/](https://pypi.org/manage/account/token/)
-   - Create a token scoped to the `aphelion` project
+   - Create a token scoped to the `aphelion-framework` project
    - Add as repository secret
 
 ## Version Bump

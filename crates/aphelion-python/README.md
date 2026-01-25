@@ -1,11 +1,11 @@
-# aphelion-python
+# aphelion-framework
 
 Python bindings for the [Aphelion AI Framework](https://github.com/tzervas/aphelion-framework-rs).
 
 ## Installation
 
 ```bash
-pip install aphelion
+pip install aphelion-framework
 ```
 
 ## Building from source

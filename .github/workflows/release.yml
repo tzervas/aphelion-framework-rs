@@ -149,7 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/aphelion/
+      url: https://pypi.org/project/aphelion-framework/
     permissions:
       id-token: write  # Required for trusted publishing
     steps:

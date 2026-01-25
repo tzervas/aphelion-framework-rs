@@ -3,9 +3,9 @@ requires = ["maturin>=1.4,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "aphelion"
+name = "aphelion-framework"
 version = "1.1.0"
-description = "Python bindings for the Aphelion AI Framework"
+description = "Python bindings for the Aphelion AI Framework (aphelion-framework-rs)"
 readme = "README.md"
 license = { text = "MIT OR Apache-2.0" }
 requires-python = ">=3.9"
