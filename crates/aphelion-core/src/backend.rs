@@ -585,7 +585,8 @@ impl MockBackend {
     /// assert!(backend.shutdown_called());
     /// ```
     pub fn shutdown_called(&self) -> bool {
-        self.shutdown_called.load(std::sync::atomic::Ordering::SeqCst)
+        self.shutdown_called
+            .load(std::sync::atomic::Ordering::SeqCst)
     }
 }
 
@@ -836,7 +837,10 @@ mod tests {
         assert!(retrieved_caps.supports_f16);
         assert!(retrieved_caps.supports_bf16);
         assert!(!retrieved_caps.supports_tf32);
-        assert_eq!(retrieved_caps.max_memory_bytes, Some(8 * 1024 * 1024 * 1024));
+        assert_eq!(
+            retrieved_caps.max_memory_bytes,
+            Some(8 * 1024 * 1024 * 1024)
+        );
         assert_eq!(retrieved_caps.compute_units, Some(1024));
     }
 

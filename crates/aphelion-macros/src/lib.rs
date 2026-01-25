@@ -115,9 +115,12 @@ pub fn aphelion_model(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Check if a type is ModelConfig
 fn is_model_config(ty: &Type) -> bool {
     match ty {
-        Type::Path(type_path) => {
-            type_path.path.segments.last().map(|s| s.ident == "ModelConfig").unwrap_or(false)
-        }
+        Type::Path(type_path) => type_path
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident == "ModelConfig")
+            .unwrap_or(false),
         _ => false,
     }
 }

@@ -12,6 +12,16 @@ use crate::graph::BuildGraph;
 use std::collections::HashSet;
 use std::time::SystemTime;
 
+/// Type alias for pre-build hook functions.
+pub type PreBuildHook = Box<dyn Fn(&BuildContext) -> AphelionResult<()> + Send + Sync>;
+
+/// Type alias for post-build hook functions.
+pub type PostBuildHook =
+    Box<dyn Fn(&BuildContext, &BuildGraph) -> AphelionResult<()> + Send + Sync>;
+
+/// Type alias for progress callback functions.
+pub type ProgressCallback = Box<dyn Fn(&str, usize, usize) + Send + Sync>;
+
 /// Execution context containing backend and tracing infrastructure.
 ///
 /// `BuildContext` provides the runtime environment for pipeline stages and builders.
@@ -55,10 +65,7 @@ impl<'a> BuildContext<'a> {
         backend: &'a crate::backend::NullBackend,
         trace: &'a dyn TraceSink,
     ) -> Self {
-        Self {
-            backend,
-            trace,
-        }
+        Self { backend, trace }
     }
 }
 
@@ -199,20 +206,12 @@ pub trait AsyncPipelineStage: Send + Sync {
 /// let mut hooks = PipelineHooks::default();
 /// // Can add hooks here
 /// ```
+#[derive(Default)]
 pub struct PipelineHooks {
     /// Callbacks to execute before any pipeline stages
-    pub pre_build: Vec<Box<dyn Fn(&BuildContext) -> AphelionResult<()> + Send + Sync>>,
+    pub pre_build: Vec<PreBuildHook>,
     /// Callbacks to execute after all pipeline stages
-    pub post_build: Vec<Box<dyn Fn(&BuildContext, &BuildGraph) -> AphelionResult<()> + Send + Sync>>,
-}
-
-impl Default for PipelineHooks {
-    fn default() -> Self {
-        Self {
-            pre_build: Vec::new(),
-            post_build: Vec::new(),
-        }
-    }
+    pub post_build: Vec<PostBuildHook>,
 }
 
 /// An extensible build pipeline for composing model construction stages.
@@ -256,7 +255,7 @@ pub struct BuildPipeline {
     async_stages: Vec<Box<dyn AsyncPipelineStage>>,
     hooks: PipelineHooks,
     skip_stages: HashSet<String>,
-    on_progress: Option<Box<dyn Fn(&str, usize, usize) + Send + Sync>>,
+    on_progress: Option<ProgressCallback>,
 }
 
 impl Default for BuildPipeline {
@@ -331,7 +330,8 @@ impl BuildPipeline {
     /// ```
     pub fn for_training() -> Self {
         Self::standard().with_pre_hook(|ctx| {
-            ctx.trace.info("pipeline.training", "Starting training pipeline");
+            ctx.trace
+                .info("pipeline.training", "Starting training pipeline");
             Ok(())
         })
     }
@@ -525,7 +525,11 @@ impl BuildPipeline {
             // Skip stage if it's in the skip list
             if self.skip_stages.contains(stage_name) {
                 if let Some(ref progress) = self.on_progress {
-                    progress(&format!("{} (skipped)", stage_name), index + 1, total_stages);
+                    progress(
+                        &format!("{} (skipped)", stage_name),
+                        index + 1,
+                        total_stages,
+                    );
                 }
                 continue;
             }
@@ -605,7 +609,11 @@ impl BuildPipeline {
             // Skip stage if it's in the skip list
             if self.skip_stages.contains(stage_name) {
                 if let Some(ref progress) = self.on_progress {
-                    progress(&format!("{} (skipped)", stage_name), index + 1, total_stages);
+                    progress(
+                        &format!("{} (skipped)", stage_name),
+                        index + 1,
+                        total_stages,
+                    );
                 }
                 continue;
             }
@@ -690,10 +698,7 @@ impl BuildPipeline {
     /// ```ignore
     /// let graph = BuildPipeline::build_with_validation(&my_model, ctx)?;
     /// ```
-    pub fn build_with_validation<M>(
-        model: &M,
-        ctx: BuildContext<'_>,
-    ) -> AphelionResult<BuildGraph>
+    pub fn build_with_validation<M>(model: &M, ctx: BuildContext<'_>) -> AphelionResult<BuildGraph>
     where
         M: ModelBuilder<Output = BuildGraph> + ConfigSpec,
     {
@@ -754,7 +759,9 @@ impl PipelineStage for ValidationStage {
 
     fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()> {
         if graph.nodes.is_empty() {
-            return Err(AphelionError::validation("graph must contain at least one node"));
+            return Err(AphelionError::validation(
+                "graph must contain at least one node",
+            ));
         }
 
         ctx.trace.record(TraceEvent {
@@ -1044,8 +1051,14 @@ mod tests {
         let progress_calls = Arc::new(Mutex::new(Vec::new()));
         let progress_calls_clone = Arc::clone(&progress_calls);
 
-        let stage1 = Box::new(RecordingStage::new("stage1", Arc::new(Mutex::new(Vec::new()))));
-        let stage2 = Box::new(RecordingStage::new("stage2", Arc::new(Mutex::new(Vec::new()))));
+        let stage1 = Box::new(RecordingStage::new(
+            "stage1",
+            Arc::new(Mutex::new(Vec::new())),
+        ));
+        let stage2 = Box::new(RecordingStage::new(
+            "stage2",
+            Arc::new(Mutex::new(Vec::new())),
+        ));
 
         let pipeline = BuildPipeline::new()
             .with_stage(stage1)
@@ -1077,9 +1090,18 @@ mod tests {
         let progress_calls = Arc::new(Mutex::new(Vec::new()));
         let progress_calls_clone = Arc::clone(&progress_calls);
 
-        let stage1 = Box::new(RecordingStage::new("stage1", Arc::new(Mutex::new(Vec::new()))));
-        let stage2 = Box::new(RecordingStage::new("stage2", Arc::new(Mutex::new(Vec::new()))));
-        let stage3 = Box::new(RecordingStage::new("stage3", Arc::new(Mutex::new(Vec::new()))));
+        let stage1 = Box::new(RecordingStage::new(
+            "stage1",
+            Arc::new(Mutex::new(Vec::new())),
+        ));
+        let stage2 = Box::new(RecordingStage::new(
+            "stage2",
+            Arc::new(Mutex::new(Vec::new())),
+        ));
+        let stage3 = Box::new(RecordingStage::new(
+            "stage3",
+            Arc::new(Mutex::new(Vec::new())),
+        ));
 
         let pipeline = BuildPipeline::new()
             .with_stage(stage1)
@@ -1195,9 +1217,8 @@ mod tests {
 
     #[test]
     fn test_hook_error_propagation() {
-        let pipeline = BuildPipeline::new().with_pre_hook(|_ctx| {
-            Err(AphelionError::validation("test error"))
-        });
+        let pipeline =
+            BuildPipeline::new().with_pre_hook(|_ctx| Err(AphelionError::validation("test error")));
 
         let trace_sink = MockTraceSink::new();
         let ctx = BuildContext {
@@ -1375,10 +1396,9 @@ mod tests {
     #[test]
     fn test_preset_pipelines_are_extensible() {
         // Verify that preset pipelines can be further customized
-        let pipeline = BuildPipeline::standard()
-            .with_progress(|name, current, total| {
-                let _ = (name, current, total);
-            });
+        let pipeline = BuildPipeline::standard().with_progress(|name, current, total| {
+            let _ = (name, current, total);
+        });
 
         // Should be able to add more stages on top of presets
         let extended = pipeline.with_stage(Box::new(ValidationStage));

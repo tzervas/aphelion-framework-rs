@@ -6,8 +6,8 @@
 
 use crate::config::ModelConfig;
 use crate::error::AphelionError;
-use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Unique identifier for a graph node.
@@ -223,10 +223,10 @@ impl BuildGraph {
         let mut rec_stack = HashSet::new();
 
         for node in &self.nodes {
-            if !visited.contains(&node.id) {
-                if self.has_cycle_dfs(node.id, &mut visited, &mut rec_stack) {
-                    return true;
-                }
+            if !visited.contains(&node.id)
+                && self.has_cycle_dfs(node.id, &mut visited, &mut rec_stack)
+            {
+                return true;
             }
         }
         false
@@ -382,12 +382,20 @@ impl BuildGraph {
 
         // Add nodes
         for node in &self.nodes {
-            dot.push_str(&format!("    \"{}\" [label=\"{}\"];\n", node.id.value(), node.name));
+            dot.push_str(&format!(
+                "    \"{}\" [label=\"{}\"];\n",
+                node.id.value(),
+                node.name
+            ));
         }
 
         // Add edges
         for (from, to) in &self.edges {
-            dot.push_str(&format!("    \"{}\" -> \"{}\";\n", from.value(), to.value()));
+            dot.push_str(&format!(
+                "    \"{}\" -> \"{}\";\n",
+                from.value(),
+                to.value()
+            ));
         }
 
         dot.push_str("}\n");

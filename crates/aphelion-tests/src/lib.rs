@@ -1,6 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use aphelion_core::backend::{Backend, BackendRegistry, DeviceCapabilities, MockBackend, NullBackend};
+    use aphelion_core::aphelion_model;
+    use aphelion_core::backend::{
+        Backend, BackendRegistry, DeviceCapabilities, MockBackend, NullBackend,
+    };
+    #[cfg(feature = "burn")]
+    use aphelion_core::burn_backend::{BurnBackendConfig, BurnDevice};
     use aphelion_core::config::ModelConfig;
     use aphelion_core::diagnostics::{
         InMemoryTraceSink, MultiSink, TraceEvent, TraceLevel, TraceSink,
@@ -8,12 +13,11 @@ mod tests {
     use aphelion_core::export::JsonExporter;
     use aphelion_core::graph::BuildGraph;
     use aphelion_core::pipeline::{BuildContext, BuildPipeline, PipelineStage};
-    use aphelion_core::validation::{CompositeValidator, ConfigValidator, NameValidator, VersionValidator};
-    use aphelion_core::aphelion_model;
+    use aphelion_core::validation::{
+        CompositeValidator, ConfigValidator, NameValidator, VersionValidator,
+    };
     use std::sync::{Arc, Mutex};
     use std::time::SystemTime;
-    #[cfg(feature = "burn")]
-    use aphelion_core::burn_backend::{BurnBackendConfig, BurnDevice};
 
     #[test]
     fn graph_hash_is_deterministic() {
@@ -140,10 +144,10 @@ mod tests {
         let mut graph1 = BuildGraph::default();
         let mut graph2 = BuildGraph::default();
 
-        let config1 = ModelConfig::new("model1", "1.0.0")
-            .with_param("layers", serde_json::json!(16));
-        let config2 = ModelConfig::new("model1", "1.0.0")
-            .with_param("layers", serde_json::json!(32));
+        let config1 =
+            ModelConfig::new("model1", "1.0.0").with_param("layers", serde_json::json!(16));
+        let config2 =
+            ModelConfig::new("model1", "1.0.0").with_param("layers", serde_json::json!(32));
 
         let n1 = graph1.add_node("layer1", config1);
         graph1.add_edge(n1, n1);
@@ -154,7 +158,10 @@ mod tests {
         let hash1 = graph1.stable_hash();
         let hash2 = graph2.stable_hash();
 
-        assert_ne!(hash1, hash2, "Different configs should produce different hashes");
+        assert_ne!(
+            hash1, hash2,
+            "Different configs should produce different hashes"
+        );
     }
 
     #[test]
@@ -247,7 +254,11 @@ mod tests {
         let result = pipeline.execute(&ctx, graph);
 
         assert!(result.is_ok());
-        assert_eq!(*counter.lock().unwrap(), 3, "All three stages should execute");
+        assert_eq!(
+            *counter.lock().unwrap(),
+            3,
+            "All three stages should execute"
+        );
     }
 
     #[test]
@@ -293,7 +304,11 @@ mod tests {
 
         assert!(result.is_err(), "Pipeline should propagate error");
         // Stage before should execute, but not after
-        assert_eq!(*counter.lock().unwrap(), 1, "Only first stage should execute before error");
+        assert_eq!(
+            *counter.lock().unwrap(),
+            1,
+            "Only first stage should execute before error"
+        );
     }
 
     #[test]
@@ -394,15 +409,14 @@ mod tests {
     #[test]
     fn backend_lifecycle_failure_injection() {
         // Test MockBackend failure injection
-        let mut backend_init_fail = MockBackend::new("fail_init", "cpu")
-            .with_init_failure();
+        let mut backend_init_fail = MockBackend::new("fail_init", "cpu").with_init_failure();
 
         let init_result = backend_init_fail.initialize();
         assert!(init_result.is_err());
         assert!(backend_init_fail.init_called());
 
-        let mut backend_shutdown_fail = MockBackend::new("fail_shutdown", "cpu")
-            .with_shutdown_failure();
+        let mut backend_shutdown_fail =
+            MockBackend::new("fail_shutdown", "cpu").with_shutdown_failure();
 
         let shutdown_result = backend_shutdown_fail.shutdown();
         assert!(shutdown_result.is_err());
@@ -420,10 +434,7 @@ mod tests {
             compute_units: Some(2048),
         };
 
-        let backend = Box::new(
-            MockBackend::new("capable", "gpu")
-                .with_capabilities(caps)
-        );
+        let backend = Box::new(MockBackend::new("capable", "gpu").with_capabilities(caps));
 
         let mut registry = BackendRegistry::new();
         registry.register(backend);
@@ -434,7 +445,10 @@ mod tests {
         assert!(retrieved_caps.supports_f16);
         assert!(retrieved_caps.supports_bf16);
         assert!(!retrieved_caps.supports_tf32);
-        assert_eq!(retrieved_caps.max_memory_bytes, Some(16 * 1024 * 1024 * 1024));
+        assert_eq!(
+            retrieved_caps.max_memory_bytes,
+            Some(16 * 1024 * 1024 * 1024)
+        );
         assert_eq!(retrieved_caps.compute_units, Some(2048));
     }
 
@@ -446,8 +460,8 @@ mod tests {
     fn composite_validator_with_real_configs() {
         // Test CompositeValidator with real model configs
         let validator = CompositeValidator::new()
-            .add(Box::new(NameValidator))
-            .add(Box::new(VersionValidator));
+            .with_validator(Box::new(NameValidator))
+            .with_validator(Box::new(VersionValidator));
 
         // Test valid config
         let valid_config = ModelConfig::new("my-model", "1.0.0");
@@ -501,15 +515,19 @@ mod tests {
     fn validator_chain_accumulates_errors() {
         // Test that composite validator accumulates all errors
         let validator = CompositeValidator::new()
-            .add(Box::new(NameValidator))
-            .add(Box::new(VersionValidator));
+            .with_validator(Box::new(NameValidator))
+            .with_validator(Box::new(VersionValidator));
 
         let config = ModelConfig::new("", "not-semver");
         let result = validator.validate(&config);
 
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert_eq!(errors.len(), 2, "Should accumulate both name and version errors");
+        assert_eq!(
+            errors.len(),
+            2,
+            "Should accumulate both name and version errors"
+        );
         assert!(errors.iter().any(|e| e.field == "name"));
         assert!(errors.iter().any(|e| e.field == "version"));
     }
@@ -667,8 +685,8 @@ mod tests {
         // Complete integration test: validation, pipeline execution, export
         let exporter = JsonExporter::new();
         let validator = CompositeValidator::new()
-            .add(Box::new(NameValidator))
-            .add(Box::new(VersionValidator));
+            .with_validator(Box::new(NameValidator))
+            .with_validator(Box::new(VersionValidator));
 
         let config = ModelConfig::new("integration-test", "1.0.0");
         assert!(validator.validate(&config).is_ok());
@@ -719,16 +737,15 @@ mod tests {
     fn pipeline_with_backend_registry_context() {
         // Test pipeline execution using backend from registry
         let mut registry = BackendRegistry::new();
-        let backend = Box::new(
-            MockBackend::new("test_backend", "cpu")
-                .with_capabilities(DeviceCapabilities {
-                    supports_f16: true,
-                    supports_bf16: false,
-                    supports_tf32: true,
-                    max_memory_bytes: Some(8 * 1024 * 1024 * 1024),
-                    compute_units: Some(512),
-                })
-        );
+        let backend = Box::new(MockBackend::new("test_backend", "cpu").with_capabilities(
+            DeviceCapabilities {
+                supports_f16: true,
+                supports_bf16: false,
+                supports_tf32: true,
+                max_memory_bytes: Some(8 * 1024 * 1024 * 1024),
+                compute_units: Some(512),
+            },
+        ));
         registry.register(backend);
 
         let selected_backend = registry.get("test_backend").unwrap();
@@ -784,7 +801,13 @@ mod tests {
                 &'a self,
                 _ctx: &'a BuildContext<'_>,
                 _graph: &'a mut BuildGraph,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>> + Send + 'a>> {
+            ) -> std::pin::Pin<
+                Box<
+                    dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>>
+                        + Send
+                        + 'a,
+                >,
+            > {
                 let counter = Arc::clone(&self.counter);
                 Box::pin(async move {
                     // Simulate async work
@@ -798,9 +821,18 @@ mod tests {
 
         let counter = Arc::new(Mutex::new(0));
 
-        let stage1 = Box::new(AsyncCountingStage::new("async_stage1", Arc::clone(&counter)));
-        let stage2 = Box::new(AsyncCountingStage::new("async_stage2", Arc::clone(&counter)));
-        let stage3 = Box::new(AsyncCountingStage::new("async_stage3", Arc::clone(&counter)));
+        let stage1 = Box::new(AsyncCountingStage::new(
+            "async_stage1",
+            Arc::clone(&counter),
+        ));
+        let stage2 = Box::new(AsyncCountingStage::new(
+            "async_stage2",
+            Arc::clone(&counter),
+        ));
+        let stage3 = Box::new(AsyncCountingStage::new(
+            "async_stage3",
+            Arc::clone(&counter),
+        ));
 
         let pipeline = BuildPipeline::new()
             .with_async_stage(stage1)
@@ -818,13 +850,17 @@ mod tests {
         let result = pipeline.execute_async(&ctx, graph).await;
 
         assert!(result.is_ok(), "Async pipeline should execute successfully");
-        assert_eq!(*counter.lock().unwrap(), 3, "All three async stages should execute");
+        assert_eq!(
+            *counter.lock().unwrap(),
+            3,
+            "All three async stages should execute"
+        );
     }
 
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn async_pipeline_with_builtin_stages() {
-        use aphelion_core::pipeline::{ValidationStage, HashingStage};
+        use aphelion_core::pipeline::{HashingStage, ValidationStage};
 
         // Test async pipeline with built-in stages that implement AsyncPipelineStage
         let mut graph = BuildGraph::default();
@@ -844,11 +880,18 @@ mod tests {
 
         let result = pipeline.execute_async(&ctx, graph).await;
 
-        assert!(result.is_ok(), "Async pipeline with validation and hashing should succeed");
+        assert!(
+            result.is_ok(),
+            "Async pipeline with validation and hashing should succeed"
+        );
 
         let events = trace.events();
-        assert!(events.iter().any(|e| e.message.contains("validated 1 nodes")));
-        assert!(events.iter().any(|e| e.message.contains("computed graph hash")));
+        assert!(events
+            .iter()
+            .any(|e| e.message.contains("validated 1 nodes")));
+        assert!(events
+            .iter()
+            .any(|e| e.message.contains("computed graph hash")));
     }
 
     #[cfg(feature = "tokio")]
@@ -868,7 +911,13 @@ mod tests {
                 &'a self,
                 _ctx: &'a BuildContext<'_>,
                 _graph: &'a mut BuildGraph,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>> + Send + 'a>> {
+            ) -> std::pin::Pin<
+                Box<
+                    dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>>
+                        + Send
+                        + 'a,
+                >,
+            > {
                 Box::pin(async move {
                     Err(aphelion_core::error::AphelionError::build(
                         "Async stage failed as expected",
@@ -892,7 +941,13 @@ mod tests {
                 &'a self,
                 _ctx: &'a BuildContext<'_>,
                 _graph: &'a mut BuildGraph,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>> + Send + 'a>> {
+            ) -> std::pin::Pin<
+                Box<
+                    dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>>
+                        + Send
+                        + 'a,
+                >,
+            > {
                 let counter = Arc::clone(&self.counter);
                 Box::pin(async move {
                     let mut c = counter.lock().unwrap();
@@ -966,7 +1021,13 @@ mod tests {
                 &'a self,
                 _ctx: &'a BuildContext<'_>,
                 _graph: &'a mut BuildGraph,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>> + Send + 'a>> {
+            ) -> std::pin::Pin<
+                Box<
+                    dyn std::future::Future<Output = aphelion_core::error::AphelionResult<()>>
+                        + Send
+                        + 'a,
+                >,
+            > {
                 let log = Arc::clone(&self.log);
                 Box::pin(async move {
                     log.lock().unwrap().push("async_stage".to_string());

@@ -11,7 +11,7 @@
 
 use aphelion_core::config::ModelConfig;
 use aphelion_core::validation::{
-    ConfigValidator, CompositeValidator, NameValidator, VersionValidator, ValidationError,
+    CompositeValidator, ConfigValidator, NameValidator, ValidationError, VersionValidator,
 };
 
 /// Custom validator for checking parameter constraints.
@@ -112,8 +112,18 @@ pub fn run_example() -> Result<(), Box<dyn std::error::Error>> {
     let version_result = VersionValidator.validate(&valid_config);
 
     println!("  Testing 'my_valid_model' v1.0.0");
-    println!("    - Name validation: {}", if name_result.is_ok() { "PASS" } else { "FAIL" });
-    println!("    - Version validation: {}", if version_result.is_ok() { "PASS" } else { "FAIL" });
+    println!(
+        "    - Name validation: {}",
+        if name_result.is_ok() { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "    - Version validation: {}",
+        if version_result.is_ok() {
+            "PASS"
+        } else {
+            "FAIL"
+        }
+    );
 
     // Invalid name
     let invalid_name_config = ModelConfig::new("invalid@model!", "1.0.0");
@@ -147,8 +157,8 @@ pub fn run_example() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n2. Composite Validator (Name + Version):");
 
     let composite = CompositeValidator::new()
-        .add(Box::new(NameValidator))
-        .add(Box::new(VersionValidator));
+        .with_validator(Box::new(NameValidator))
+        .with_validator(Box::new(VersionValidator));
 
     let all_valid = ModelConfig::new("valid-model_123", "2.0.1");
     println!("\n  Testing 'valid-model_123' v2.0.1");
@@ -177,10 +187,8 @@ pub fn run_example() -> Result<(), Box<dyn std::error::Error>> {
     // Example 3: Custom validators
     println!("\n3. Custom Validators (Parameters):");
 
-    let param_validator = ParameterValidator::new(vec![
-        "hidden_size".to_string(),
-        "layers".to_string(),
-    ]);
+    let param_validator =
+        ParameterValidator::new(vec!["hidden_size".to_string(), "layers".to_string()]);
 
     let complete_config = ModelConfig::new("my_model", "1.0.0")
         .with_param("hidden_size", serde_json::json!(256))
@@ -197,8 +205,8 @@ pub fn run_example() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let incomplete_config = ModelConfig::new("my_model", "1.0.0")
-        .with_param("hidden_size", serde_json::json!(256));
+    let incomplete_config =
+        ModelConfig::new("my_model", "1.0.0").with_param("hidden_size", serde_json::json!(256));
 
     println!("\n  Testing config missing 'layers' parameter:");
     match param_validator.validate(&incomplete_config) {
@@ -250,13 +258,13 @@ pub fn run_example() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n5. Multi-Level Composite Validator:");
 
     let comprehensive = CompositeValidator::new()
-        .add(Box::new(NameValidator))
-        .add(Box::new(VersionValidator))
-        .add(Box::new(ParameterValidator::new(vec![
+        .with_validator(Box::new(NameValidator))
+        .with_validator(Box::new(VersionValidator))
+        .with_validator(Box::new(ParameterValidator::new(vec![
             "hidden_size".to_string(),
             "layers".to_string(),
         ])))
-        .add(Box::new(ParameterValueValidator::new(64, 32)));
+        .with_validator(Box::new(ParameterValueValidator::new(64, 32)));
 
     let good_config = ModelConfig::new("transformer-base", "1.2.3")
         .with_param("hidden_size", serde_json::json!(512))
@@ -273,14 +281,17 @@ pub fn run_example() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let bad_config = ModelConfig::new("bad#model", "1.0")
-        .with_param("hidden_size", serde_json::json!(32));
+    let bad_config =
+        ModelConfig::new("bad#model", "1.0").with_param("hidden_size", serde_json::json!(32));
 
     println!("\n  Testing comprehensive validation (invalid config):");
     match comprehensive.validate(&bad_config) {
         Ok(_) => println!("    - Comprehensive validation: PASS"),
         Err(errors) => {
-            println!("    - Comprehensive validation: FAIL ({} errors)", errors.len());
+            println!(
+                "    - Comprehensive validation: FAIL ({} errors)",
+                errors.len()
+            );
             for error in errors {
                 println!("      * {}", error);
             }

@@ -311,10 +311,16 @@ mod tests {
     #[test]
     fn test_error_display_messages() {
         let validation_err = AphelionError::validation("invalid input");
-        assert_eq!(validation_err.to_string(), "validation error: invalid input");
+        assert_eq!(
+            validation_err.to_string(),
+            "validation error: invalid input"
+        );
 
         let serialization_err = AphelionError::serialization("bad format");
-        assert_eq!(serialization_err.to_string(), "serialization error: bad format");
+        assert_eq!(
+            serialization_err.to_string(),
+            "serialization error: bad format"
+        );
 
         let io_err = AphelionError::io("permission denied");
         assert_eq!(io_err.to_string(), "io error: permission denied");

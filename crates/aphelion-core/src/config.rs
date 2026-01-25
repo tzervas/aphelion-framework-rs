@@ -217,6 +217,7 @@ impl ModelConfig {
     /// Returns `AphelionError::InvalidConfig` if:
     /// - The key does not exist in the parameters
     /// - The value cannot be deserialized into the requested type
+    ///
     /// The error message includes the key name and expected type information.
     ///
     /// # Examples
@@ -236,10 +237,7 @@ impl ModelConfig {
     /// ```
     pub fn param<T: DeserializeOwned>(&self, key: &str) -> AphelionResult<T> {
         let value = self.params.get(key).ok_or_else(|| {
-            AphelionError::config_error(format!(
-                "parameter '{}' not found in configuration",
-                key
-            ))
+            AphelionError::config_error(format!("parameter '{}' not found in configuration", key))
         })?;
 
         serde_json::from_value(value.clone()).map_err(|e| {
@@ -590,9 +588,7 @@ mod tests {
 
     #[test]
     fn test_builder_missing_name() {
-        let result = ModelConfigBuilder::new()
-            .version("1.0.0")
-            .build();
+        let result = ModelConfigBuilder::new().version("1.0.0").build();
 
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "ModelConfig requires a name");
@@ -600,9 +596,7 @@ mod tests {
 
     #[test]
     fn test_builder_missing_version() {
-        let result = ModelConfigBuilder::new()
-            .name("test_model")
-            .build();
+        let result = ModelConfigBuilder::new().name("test_model").build();
 
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "ModelConfig requires a version");
@@ -741,11 +735,17 @@ mod tests {
             .with_param("layers", serde_json::json!(4))
             .with_param("activation", serde_json::json!("relu"));
 
-        let hidden_size: u32 = config.param("hidden_size").expect("failed to get hidden_size");
+        let hidden_size: u32 = config
+            .param("hidden_size")
+            .expect("failed to get hidden_size");
         assert_eq!(hidden_size, 512);
 
         let dropout: f32 = config.param("dropout").expect("failed to get dropout");
-        assert!((dropout - 0.1).abs() < 0.0001, "dropout mismatch: {}", dropout);
+        assert!(
+            (dropout - 0.1).abs() < 0.0001,
+            "dropout mismatch: {}",
+            dropout
+        );
 
         let layers: u32 = config.param("layers").expect("failed to get layers");
         assert_eq!(layers, 4);
@@ -758,8 +758,8 @@ mod tests {
 
     #[test]
     fn test_typed_param_missing_key() {
-        let config = ModelConfig::new("model", "1.0.0")
-            .with_param("hidden_size", serde_json::json!(512));
+        let config =
+            ModelConfig::new("model", "1.0.0").with_param("hidden_size", serde_json::json!(512));
 
         let result: Result<u32, _> = config.param("nonexistent");
         assert!(result.is_err());
@@ -793,13 +793,10 @@ mod tests {
 
     #[test]
     fn test_param_or_default() {
-        let config = ModelConfig::new("model", "1.0.0")
-            .with_param("seed", serde_json::json!(42));
+        let config = ModelConfig::new("model", "1.0.0").with_param("seed", serde_json::json!(42));
 
         // Existing parameter
-        let seed: u32 = config
-            .param_or_default("seed")
-            .expect("failed to get seed");
+        let seed: u32 = config.param_or_default("seed").expect("failed to get seed");
         assert_eq!(seed, 42);
 
         // Missing parameter with Default
@@ -809,9 +806,7 @@ mod tests {
         assert_eq!(threads, 0);
 
         // Missing parameter with String default
-        let name: String = config
-            .param_or_default("name")
-            .expect("failed to get name");
+        let name: String = config.param_or_default("name").expect("failed to get name");
         assert_eq!(name, "");
     }
 

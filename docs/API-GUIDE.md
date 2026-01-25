@@ -487,8 +487,8 @@ assert!(result.is_ok());
 
 // Composite validator
 let validator = CompositeValidator::new()
-    .add(Box::new(NameValidator))
-    .add(Box::new(VersionValidator));
+    .with_validator(Box::new(NameValidator))
+    .with_validator(Box::new(VersionValidator));
 
 let result = validator.validate(&config);
 assert!(result.is_ok());
@@ -559,8 +559,8 @@ impl ConfigValidationStage {
     fn new() -> Self {
         Self {
             validator: CompositeValidator::new()
-                .add(Box::new(NameValidator))
-                .add(Box::new(VersionValidator)),
+                .with_validator(Box::new(NameValidator))
+                .with_validator(Box::new(VersionValidator)),
         }
     }
 }
@@ -844,8 +844,8 @@ let hidden_size = config.params.get("hidden_size").unwrap().as_u64().unwrap();
 ```rust
 // Good: Validate before expensive operations
 let validator = CompositeValidator::new()
-    .add(Box::new(NameValidator))
-    .add(Box::new(VersionValidator));
+    .with_validator(Box::new(NameValidator))
+    .with_validator(Box::new(VersionValidator));
 validator.validate(&config)?;
 
 // Then proceed with expensive graph building

@@ -730,7 +730,10 @@ mod tests {
 
         // Test with String conversion via Into<String>
         let field_name = "deprecated_field";
-        sink.warn("config.field", format!("Field '{}' is deprecated", field_name));
+        sink.warn(
+            "config.field",
+            format!("Field '{}' is deprecated", field_name),
+        );
 
         let events = sink.events();
         assert_eq!(events.len(), 1);

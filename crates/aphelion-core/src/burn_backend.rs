@@ -1,6 +1,6 @@
 //! Burn backend integration (feature-gated).
 
-use crate::backend::Backend;
+use crate::backend::{Backend, DeviceCapabilities};
 
 /// Supported burn device selectors (placeholder).
 #[derive(Debug, Clone)]
@@ -68,5 +68,43 @@ impl Backend for BurnBackend {
             BurnDevice::Metal(_) => "metal",
             BurnDevice::Vulkan(_) => "vulkan",
         }
+    }
+
+    fn capabilities(&self) -> DeviceCapabilities {
+        match &self.config.device {
+            BurnDevice::Cpu => DeviceCapabilities {
+                supports_f16: false,
+                supports_bf16: false,
+                supports_tf32: false,
+                max_memory_bytes: None,
+                compute_units: None,
+            },
+            BurnDevice::Cuda(_) => DeviceCapabilities {
+                supports_f16: true,
+                supports_bf16: true,
+                supports_tf32: self.config.allow_tf32,
+                max_memory_bytes: None, // Would be queried from actual device
+                compute_units: None,
+            },
+            BurnDevice::Metal(_) => DeviceCapabilities {
+                supports_f16: true,
+                supports_bf16: false,
+                supports_tf32: false,
+                max_memory_bytes: None,
+                compute_units: None,
+            },
+            BurnDevice::Vulkan(_) => DeviceCapabilities {
+                supports_f16: true,
+                supports_bf16: false,
+                supports_tf32: false,
+                max_memory_bytes: None,
+                compute_units: None,
+            },
+        }
+    }
+
+    fn is_available(&self) -> bool {
+        // Placeholder: actual implementation would check device availability
+        true
     }
 }
