@@ -1,6 +1,6 @@
 use crate::backend::{Backend, ModelBuilder};
 use crate::config::ConfigSpec;
-use crate::diagnostics::{TraceEvent, TraceSink};
+use crate::diagnostics::{TraceEvent, TraceLevel, TraceSink};
 use crate::error::{AphelionError, AphelionResult};
 use crate::graph::BuildGraph;
 use std::time::SystemTime;
@@ -23,6 +23,9 @@ impl BuildPipeline {
             id: "pipeline.start".to_string(),
             message: "build started".to_string(),
             timestamp: SystemTime::now(),
+            level: TraceLevel::Info,
+            span_id: None,
+            trace_id: None,
         });
 
         let graph = model.build(ctx.backend, ctx.trace);
@@ -31,6 +34,9 @@ impl BuildPipeline {
             id: "pipeline.finish".to_string(),
             message: format!("build completed hash={}", graph.stable_hash()),
             timestamp: SystemTime::now(),
+            level: TraceLevel::Info,
+            span_id: None,
+            trace_id: None,
         });
 
         Ok(graph)
@@ -59,6 +65,9 @@ impl BuildPipeline {
             id: "pipeline.validate".to_string(),
             message: format!("validated {}@{}", config.name, config.version),
             timestamp: SystemTime::now(),
+            level: TraceLevel::Info,
+            span_id: None,
+            trace_id: None,
         });
 
         Self::build(model, ctx)

@@ -4,6 +4,7 @@ pub mod backend;
 pub mod config;
 pub mod diagnostics;
 pub mod error;
+pub mod export;
 pub mod graph;
 pub mod pipeline;
 pub mod prelude;
