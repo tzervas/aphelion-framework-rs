@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "aphelion"
-version = "1.0.0"
+version = "1.1.0"
 description = "Python bindings for the Aphelion AI Framework"
 readme = "README.md"
 license = { text = "MIT OR Apache-2.0" }

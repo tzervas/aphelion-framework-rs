@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "aphelion-core"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "aphelion-macros",
  "hex",
@@ -18,7 +18,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-examples"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "aphelion-core",
  "serde_json",
@@ -26,7 +26,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-macros"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-python"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "aphelion-core",
  "pyo3",
@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-tests"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "aphelion-core",
  "serde_json",
