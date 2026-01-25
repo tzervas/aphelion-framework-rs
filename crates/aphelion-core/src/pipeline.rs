@@ -269,6 +269,14 @@ mod tests {
         fn device(&self) -> &str {
             "mock_device"
         }
+
+        fn capabilities(&self) -> crate::backend::DeviceCapabilities {
+            crate::backend::DeviceCapabilities::default()
+        }
+
+        fn is_available(&self) -> bool {
+            true
+        }
     }
 
     /// Mock trace sink for testing
