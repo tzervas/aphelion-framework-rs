@@ -301,8 +301,8 @@ impl BuildGraph {
     /// ```
     pub fn topological_sort(&self) -> Result<Vec<NodeId>, AphelionError> {
         if self.has_cycle() {
-            return Err(AphelionError::Build(
-                "Cannot perform topological sort: graph contains a cycle".to_string(),
+            return Err(AphelionError::build(
+                "Cannot perform topological sort: graph contains a cycle",
             ));
         }
 
@@ -341,8 +341,8 @@ impl BuildGraph {
         }
 
         if result.len() != self.nodes.len() {
-            return Err(AphelionError::Build(
-                "Topological sort failed: not all nodes were processed".to_string(),
+            return Err(AphelionError::build(
+                "Topological sort failed: not all nodes were processed",
             ));
         }
 

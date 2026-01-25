@@ -44,6 +44,24 @@ pub struct BuildContext<'a> {
     pub trace: &'a dyn TraceSink,
 }
 
+impl<'a> BuildContext<'a> {
+    /// Creates a new `BuildContext` with the provided backend and trace sink.
+    pub fn new(backend: &'a dyn Backend, trace: &'a dyn TraceSink) -> Self {
+        Self { backend, trace }
+    }
+
+    /// Creates a new `BuildContext` with a provided null backend for testing scenarios.
+    pub fn with_null_backend(
+        backend: &'a crate::backend::NullBackend,
+        trace: &'a dyn TraceSink,
+    ) -> Self {
+        Self {
+            backend,
+            trace,
+        }
+    }
+}
+
 /// Trait for composable pipeline stages.
 ///
 /// `PipelineStage` defines the interface for individual stages in a build pipeline.
@@ -447,14 +465,10 @@ impl BuildPipeline {
     {
         let config = model.config();
         if config.name.trim().is_empty() {
-            return Err(AphelionError::InvalidConfig(
-                "name cannot be empty".to_string(),
-            ));
+            return Err(AphelionError::config_error("name cannot be empty"));
         }
         if config.version.trim().is_empty() {
-            return Err(AphelionError::InvalidConfig(
-                "version cannot be empty".to_string(),
-            ));
+            return Err(AphelionError::config_error("version cannot be empty"));
         }
 
         ctx.trace.record(TraceEvent {
@@ -506,9 +520,7 @@ impl PipelineStage for ValidationStage {
 
     fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()> {
         if graph.nodes.is_empty() {
-            return Err(AphelionError::Validation(
-                "graph must contain at least one node".to_string(),
-            ));
+            return Err(AphelionError::validation("graph must contain at least one node"));
         }
 
         ctx.trace.record(TraceEvent {
@@ -908,7 +920,7 @@ mod tests {
     #[test]
     fn test_hook_error_propagation() {
         let pipeline = BuildPipeline::new().with_pre_hook(|_ctx| {
-            Err(AphelionError::Build("test error".to_string()))
+            Err(AphelionError::validation("test error"))
         });
 
         let trace_sink = MockTraceSink::new();
@@ -921,5 +933,44 @@ mod tests {
         let result = pipeline.execute(&ctx, graph);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_context_new() {
+        let backend = MockBackend;
+        let trace_sink = MockTraceSink::new();
+
+        let ctx = BuildContext::new(&backend, &trace_sink);
+
+        assert_eq!(ctx.backend.name(), "mock");
+        assert_eq!(ctx.backend.device(), "mock_device");
+        assert!(ctx.backend.is_available());
+    }
+
+    #[test]
+    fn test_build_context_with_null_backend() {
+        let backend = crate::backend::NullBackend::cpu();
+        let trace_sink = MockTraceSink::new();
+
+        let ctx = BuildContext::with_null_backend(&backend, &trace_sink);
+
+        assert_eq!(ctx.backend.name(), "null");
+        assert_eq!(ctx.backend.device(), "cpu");
+        assert!(ctx.backend.is_available());
+    }
+
+    #[test]
+    fn test_build_context_new_vs_struct_literal() {
+        let backend = MockBackend;
+        let trace_sink = MockTraceSink::new();
+
+        let ctx_new = BuildContext::new(&backend, &trace_sink);
+        let ctx_literal = BuildContext {
+            backend: &backend,
+            trace: &trace_sink,
+        };
+
+        assert_eq!(ctx_new.backend.name(), ctx_literal.backend.name());
+        assert_eq!(ctx_new.backend.device(), ctx_literal.backend.device());
     }
 }

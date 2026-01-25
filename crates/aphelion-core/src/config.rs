@@ -236,14 +236,14 @@ impl ModelConfig {
     /// ```
     pub fn param<T: DeserializeOwned>(&self, key: &str) -> AphelionResult<T> {
         let value = self.params.get(key).ok_or_else(|| {
-            AphelionError::InvalidConfig(format!(
+            AphelionError::config_error(format!(
                 "parameter '{}' not found in configuration",
                 key
             ))
         })?;
 
         serde_json::from_value(value.clone()).map_err(|e| {
-            AphelionError::InvalidConfig(format!(
+            AphelionError::config_error(format!(
                 "failed to deserialize parameter '{}' to type '{}': {}",
                 key,
                 std::any::type_name::<T>(),
@@ -286,7 +286,7 @@ impl ModelConfig {
         match self.params.get(key) {
             None => Ok(default),
             Some(value) => serde_json::from_value(value.clone()).map_err(|e| {
-                AphelionError::InvalidConfig(format!(
+                AphelionError::config_error(format!(
                     "failed to deserialize parameter '{}' to type '{}': {}",
                     key,
                     std::any::type_name::<T>(),

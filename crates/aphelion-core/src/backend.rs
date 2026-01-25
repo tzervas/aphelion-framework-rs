@@ -515,8 +515,8 @@ impl Backend for MockBackend {
         self.init_called
             .store(true, std::sync::atomic::Ordering::SeqCst);
         if self.should_fail_init {
-            Err(crate::error::AphelionError::Backend(
-                "MockBackend initialization failed".to_string(),
+            Err(crate::error::AphelionError::backend(
+                "MockBackend initialization failed",
             ))
         } else {
             Ok(())
@@ -527,8 +527,8 @@ impl Backend for MockBackend {
         self.shutdown_called
             .store(true, std::sync::atomic::Ordering::SeqCst);
         if self.should_fail_shutdown {
-            Err(crate::error::AphelionError::Backend(
-                "MockBackend shutdown failed".to_string(),
+            Err(crate::error::AphelionError::backend(
+                "MockBackend shutdown failed",
             ))
         } else {
             Ok(())
