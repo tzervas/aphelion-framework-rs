@@ -30,4 +30,4 @@ rust-ai-core = ["aphelion-core/rust-ai-core"]
 cuda = ["aphelion-core/cuda"]
 tritter-accel = ["aphelion-core/tritter-accel"]
 # Build all optional backends
-full = ["burn", "cubecl", "rust-ai-core", "tritter-accel"]
+full = ["burn", "cubecl", "rust-ai-core", "cuda", "tritter-accel"]

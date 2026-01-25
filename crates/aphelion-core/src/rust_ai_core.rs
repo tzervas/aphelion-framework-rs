@@ -406,16 +406,36 @@ pub mod placeholder {
 
         pub fn allocate(&self, bytes: usize) -> AphelionResult<()> {
             use std::sync::atomic::Ordering;
-            let current = self.allocated.fetch_add(bytes, Ordering::SeqCst) + bytes;
-            if current > self.limit {
-                self.allocated.fetch_sub(bytes, Ordering::SeqCst);
-                return Err(AphelionError::backend(format!(
-                    "Memory limit exceeded: {} > {}",
-                    current, self.limit
-                )));
+
+            // Atomically check-and-add to ensure we never exceed the limit,
+            // even under concurrent allocations.
+            let mut current = self.allocated.load(Ordering::SeqCst);
+            loop {
+                let new = current.saturating_add(bytes);
+
+                if new > self.limit {
+                    return Err(AphelionError::backend(format!(
+                        "Memory limit exceeded: {} > {}",
+                        new, self.limit
+                    )));
+                }
+
+                match self.allocated.compare_exchange(
+                    current,
+                    new,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                ) {
+                    Ok(_) => {
+                        self.peak.fetch_max(new, Ordering::SeqCst);
+                        return Ok(());
+                    }
+                    Err(actual) => {
+                        // Another thread updated `allocated`; retry with the new value.
+                        current = actual;
+                    }
+                }
             }
-            self.peak.fetch_max(current, Ordering::SeqCst);
-            Ok(())
         }
 
         pub fn deallocate(&self, bytes: usize) {
@@ -440,6 +460,16 @@ pub mod placeholder {
 
         pub fn limit_bytes(&self) -> usize {
             self.limit
+        }
+
+        /// Get the overhead factor used for memory estimation.
+        pub fn overhead_factor(&self) -> f64 {
+            self.overhead_factor
+        }
+
+        /// Estimate memory with overhead factor applied.
+        pub fn estimate_with_overhead(&self, bytes: usize) -> usize {
+            (bytes as f64 * self.overhead_factor).ceil() as usize
         }
     }
 
@@ -494,13 +524,18 @@ pub mod placeholder {
 
     impl AphelionDevice {
         pub fn from_config(config: DeviceConfig) -> AphelionResult<Self> {
-            let device = if config.force_cpu {
-                RacDevice::default_cpu()
-            } else if let Some(ordinal) = config.cuda_device {
-                RacDevice::cuda(ordinal as u32)
-            } else {
-                RacDevice::default_cpu()
-            };
+            if config.force_cpu {
+                let device = RacDevice::default_cpu();
+                return Ok(Self { device, config });
+            }
+
+            if config.cuda_device.is_some() {
+                return Err(AphelionError::backend(
+                    "CUDA not available (rust-ai-core feature disabled)",
+                ));
+            }
+
+            let device = RacDevice::default_cpu();
             Ok(Self { device, config })
         }
 
