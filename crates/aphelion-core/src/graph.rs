@@ -232,7 +232,16 @@ impl BuildGraph {
         false
     }
 
-    /// Helper function for cycle detection using DFS.
+    /// Depth-first search helper for cycle detection.
+    ///
+    /// Recursively visits nodes, maintaining a recursion stack to detect back edges
+    /// that would indicate a cycle.
+    ///
+    /// # Arguments
+    ///
+    /// * `node_id` - Current node being visited
+    /// * `visited` - Set of all visited nodes
+    /// * `rec_stack` - Current recursion stack
     fn has_cycle_dfs(
         &self,
         node_id: NodeId,
@@ -260,7 +269,36 @@ impl BuildGraph {
     }
 
     /// Returns nodes in topological order using Kahn's algorithm.
-    /// Returns an error if the graph contains a cycle.
+    ///
+    /// Topological ordering ensures that for every directed edge (u, v), node u
+    /// comes before v in the ordering. This is essential for determining a valid
+    /// execution order for the graph. Returns an error if the graph contains a cycle.
+    ///
+    /// # Errors
+    ///
+    /// Returns `AphelionError::Build` if the graph contains a cycle.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::graph::BuildGraph;
+    /// use aphelion_core::config::ModelConfig;
+    ///
+    /// let mut graph = BuildGraph::default();
+    /// let config = ModelConfig::new("model", "1.0.0");
+    ///
+    /// let n1 = graph.add_node("n1", config.clone());
+    /// let n2 = graph.add_node("n2", config.clone());
+    /// let n3 = graph.add_node("n3", config);
+    ///
+    /// graph.add_edge(n1, n2);
+    /// graph.add_edge(n2, n3);
+    ///
+    /// let sorted = graph.topological_sort().expect("valid DAG");
+    /// assert_eq!(sorted.len(), 3);
+    /// assert_eq!(sorted[0], n1);
+    /// assert_eq!(sorted[2], n3);
+    /// ```
     pub fn topological_sort(&self) -> Result<Vec<NodeId>, AphelionError> {
         if self.has_cycle() {
             return Err(AphelionError::Build(
@@ -311,7 +349,34 @@ impl BuildGraph {
         Ok(result)
     }
 
-    /// Export the graph in DOT format for visualization.
+    /// Exports the graph in DOT (GraphViz) format for visualization.
+    ///
+    /// The DOT format can be used with GraphViz tools to generate visual representations
+    /// of the graph. This is useful for debugging and understanding model architecture.
+    ///
+    /// # Returns
+    ///
+    /// A string containing the DOT representation of the graph
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::graph::BuildGraph;
+    /// use aphelion_core::config::ModelConfig;
+    ///
+    /// let mut graph = BuildGraph::default();
+    /// let config = ModelConfig::new("model", "1.0.0");
+    ///
+    /// let n1 = graph.add_node("input", config.clone());
+    /// let n2 = graph.add_node("output", config);
+    /// graph.add_edge(n1, n2);
+    ///
+    /// let dot = graph.to_dot();
+    /// assert!(dot.contains("digraph BuildGraph"));
+    /// assert!(dot.contains("input"));
+    /// assert!(dot.contains("output"));
+    /// assert!(dot.contains("->"));
+    /// ```
     pub fn to_dot(&self) -> String {
         let mut dot = String::from("digraph BuildGraph {\n");
 
