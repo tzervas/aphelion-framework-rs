@@ -27,6 +27,7 @@ default = []
 burn = ["aphelion-core/burn"]
 cubecl = ["aphelion-core/cubecl"]
 rust-ai-core = ["aphelion-core/rust-ai-core"]
+cuda = ["aphelion-core/cuda"]
 tritter-accel = ["aphelion-core/tritter-accel"]
 # Build all optional backends
 full = ["burn", "cubecl", "rust-ai-core", "tritter-accel"]

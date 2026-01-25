@@ -12,10 +12,11 @@ readme = "../../README.md"
 
 [features]
 default = []
-# Ecosystem integrations - feature flags defined but deps commented until ready
+# Ecosystem integrations
 burn = []
 cubecl = []
-rust-ai-core = []
+rust-ai-core = ["dep:rust-ai-core", "dep:candle-core"]
+cuda = ["rust-ai-core", "rust-ai-core/cuda"]
 tritter-accel = []
 tokio = ["dep:tokio"]
 
@@ -30,6 +31,8 @@ tokio = { workspace = true, optional = true }
 
 aphelion-macros = { version = "1.1.0", path = "../aphelion-macros" }
 
-# Ecosystem dependencies (uncomment when ready)
+# Ecosystem dependencies
 # burn = { version = "0.16", optional = true }
 # cubecl = { version = "0.4", optional = true }
+rust-ai-core = { workspace = true, optional = true }
+candle-core = { workspace = true, optional = true }
