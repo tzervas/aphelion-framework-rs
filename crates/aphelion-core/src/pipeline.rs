@@ -12,6 +12,9 @@ use crate::graph::BuildGraph;
 use std::collections::HashSet;
 use std::time::SystemTime;
 
+#[cfg(feature = "rust-ai-core")]
+use crate::rust_ai_core::MemoryTracker;
+
 /// Type alias for pre-build hook functions.
 pub type PreBuildHook = Box<dyn Fn(&BuildContext) -> AphelionResult<()> + Send + Sync>;
 
@@ -31,6 +34,7 @@ pub type ProgressCallback = Box<dyn Fn(&str, usize, usize) + Send + Sync>;
 ///
 /// * `backend` - The computational backend to use for operations
 /// * `trace` - The trace sink for recording diagnostic events
+/// * `memory_tracker` - Optional memory tracker (requires `rust-ai-core` feature)
 ///
 /// # Examples
 ///
@@ -42,30 +46,132 @@ pub type ProgressCallback = Box<dyn Fn(&str, usize, usize) + Send + Sync>;
 /// let backend = NullBackend::cpu();
 /// let trace = InMemoryTraceSink::new();
 ///
-/// let ctx = BuildContext {
-///     backend: &backend,
-///     trace: &trace,
-/// };
+/// let ctx = BuildContext::new(&backend, &trace);
 /// ```
 pub struct BuildContext<'a> {
     /// The computational backend
     pub backend: &'a dyn Backend,
     /// The trace sink for recording events
     pub trace: &'a dyn TraceSink,
+    /// Optional memory tracker for GPU memory management
+    #[cfg(feature = "rust-ai-core")]
+    pub memory_tracker: Option<&'a MemoryTracker>,
 }
 
 impl<'a> BuildContext<'a> {
     /// Creates a new `BuildContext` with the provided backend and trace sink.
+    #[cfg(feature = "rust-ai-core")]
+    pub fn new(backend: &'a dyn Backend, trace: &'a dyn TraceSink) -> Self {
+        Self {
+            backend,
+            trace,
+            memory_tracker: None,
+        }
+    }
+
+    /// Creates a new `BuildContext` with the provided backend and trace sink.
+    #[cfg(not(feature = "rust-ai-core"))]
     pub fn new(backend: &'a dyn Backend, trace: &'a dyn TraceSink) -> Self {
         Self { backend, trace }
     }
 
     /// Creates a new `BuildContext` with a provided null backend for testing scenarios.
+    #[cfg(feature = "rust-ai-core")]
+    pub fn with_null_backend(
+        backend: &'a crate::backend::NullBackend,
+        trace: &'a dyn TraceSink,
+    ) -> Self {
+        Self {
+            backend,
+            trace,
+            memory_tracker: None,
+        }
+    }
+
+    /// Creates a new `BuildContext` with a provided null backend for testing scenarios.
+    #[cfg(not(feature = "rust-ai-core"))]
     pub fn with_null_backend(
         backend: &'a crate::backend::NullBackend,
         trace: &'a dyn TraceSink,
     ) -> Self {
         Self { backend, trace }
+    }
+
+    /// Creates a new `BuildContext` with memory tracking enabled.
+    ///
+    /// The memory tracker can be used to monitor GPU memory usage during
+    /// pipeline execution and prevent OOM errors.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use aphelion_core::pipeline::BuildContext;
+    /// use aphelion_core::rust_ai_core::MemoryTracker;
+    ///
+    /// let tracker = MemoryTracker::with_limit(8 * 1024 * 1024 * 1024); // 8GB
+    /// let ctx = BuildContext::with_memory_tracker(&backend, &trace, &tracker);
+    /// ```
+    #[cfg(feature = "rust-ai-core")]
+    pub fn with_memory_tracker(
+        backend: &'a dyn Backend,
+        trace: &'a dyn TraceSink,
+        memory_tracker: &'a MemoryTracker,
+    ) -> Self {
+        Self {
+            backend,
+            trace,
+            memory_tracker: Some(memory_tracker),
+        }
+    }
+
+    /// Check if an allocation would fit in the memory budget.
+    ///
+    /// Returns `true` if no memory tracker is configured or if the
+    /// allocation would fit within the limit.
+    #[cfg(feature = "rust-ai-core")]
+    pub fn would_fit(&self, bytes: usize) -> bool {
+        self.memory_tracker
+            .map(|t| t.would_fit(bytes))
+            .unwrap_or(true)
+    }
+
+    /// Record an allocation in the memory tracker.
+    ///
+    /// Returns `Ok(())` if no memory tracker is configured or if the
+    /// allocation succeeds. Returns an error if the allocation would
+    /// exceed the memory limit.
+    #[cfg(feature = "rust-ai-core")]
+    pub fn allocate(&self, bytes: usize) -> AphelionResult<()> {
+        if let Some(tracker) = self.memory_tracker {
+            tracker
+                .allocate(bytes)
+                .map_err(|e| AphelionError::backend(format!("OOM: {}", e)))?;
+        }
+        Ok(())
+    }
+
+    /// Record a deallocation in the memory tracker.
+    #[cfg(feature = "rust-ai-core")]
+    pub fn deallocate(&self, bytes: usize) {
+        if let Some(tracker) = self.memory_tracker {
+            tracker.deallocate(bytes);
+        }
+    }
+
+    /// Get the current allocated bytes from the memory tracker.
+    ///
+    /// Returns `None` if no memory tracker is configured.
+    #[cfg(feature = "rust-ai-core")]
+    pub fn allocated_bytes(&self) -> Option<usize> {
+        self.memory_tracker.map(|t| t.allocated_bytes())
+    }
+
+    /// Get the peak allocated bytes from the memory tracker.
+    ///
+    /// Returns `None` if no memory tracker is configured.
+    #[cfg(feature = "rust-ai-core")]
+    pub fn peak_bytes(&self) -> Option<usize> {
+        self.memory_tracker.map(|t| t.peak_bytes())
     }
 }
 
@@ -241,10 +347,7 @@ pub struct PipelineHooks {
 ///
 /// let backend = NullBackend::cpu();
 /// let trace = InMemoryTraceSink::new();
-/// let ctx = BuildContext {
-///     backend: &backend,
-///     trace: &trace,
-/// };
+/// let ctx = BuildContext::new(&backend, &trace);
 ///
 /// let result = pipeline.execute(&ctx, graph);
 /// assert!(result.is_ok());
@@ -743,10 +846,7 @@ impl BuildPipeline {
 /// let stage = ValidationStage;
 /// let backend = NullBackend::cpu();
 /// let trace = InMemoryTraceSink::new();
-/// let ctx = BuildContext {
-///     backend: &backend,
-///     trace: &trace,
-/// };
+/// let ctx = BuildContext::new(&backend, &trace);
 ///
 /// assert!(stage.execute(&ctx, &mut graph).is_ok());
 /// ```
@@ -797,10 +897,7 @@ impl PipelineStage for ValidationStage {
 /// let stage = HashingStage;
 /// let backend = NullBackend::cpu();
 /// let trace = InMemoryTraceSink::new();
-/// let ctx = BuildContext {
-///     backend: &backend,
-///     trace: &trace,
-/// };
+/// let ctx = BuildContext::new(&backend, &trace);
 ///
 /// assert!(stage.execute(&ctx, &mut graph).is_ok());
 /// let events = trace.events();
@@ -976,10 +1073,7 @@ mod tests {
             .with_stage(stage3);
 
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let graph = BuildGraph::default();
         let _result = pipeline.execute(&ctx, graph);
@@ -999,10 +1093,7 @@ mod tests {
         });
 
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let graph = BuildGraph::default();
         let _result = pipeline.execute(&ctx, graph);
@@ -1021,10 +1112,7 @@ mod tests {
         });
 
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let graph = BuildGraph::default();
         let _result = pipeline.execute(&ctx, graph);
@@ -1047,10 +1135,7 @@ mod tests {
             .with_skip_stage("stage2");
 
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let graph = BuildGraph::default();
         let _result = pipeline.execute(&ctx, graph);
@@ -1084,10 +1169,7 @@ mod tests {
             });
 
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let graph = BuildGraph::default();
         let _result = pipeline.execute(&ctx, graph);
@@ -1129,10 +1211,7 @@ mod tests {
             });
 
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let graph = BuildGraph::default();
         let _result = pipeline.execute(&ctx, graph);
@@ -1147,10 +1226,7 @@ mod tests {
     #[test]
     fn test_validation_stage() {
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let mut graph = BuildGraph::default();
         let result = ValidationStage.execute(&ctx, &mut graph);
@@ -1162,10 +1238,7 @@ mod tests {
     #[test]
     fn test_validation_stage_with_nodes() {
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let mut graph = BuildGraph::default();
         let config = ModelConfig::new("test", "1.0");
@@ -1181,10 +1254,7 @@ mod tests {
     #[test]
     fn test_hashing_stage() {
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let mut graph = BuildGraph::default();
         let config = ModelConfig::new("test", "1.0");
@@ -1216,10 +1286,7 @@ mod tests {
             });
 
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let graph = BuildGraph::default();
         let _result = pipeline.execute(&ctx, graph);
@@ -1234,10 +1301,7 @@ mod tests {
             BuildPipeline::new().with_pre_hook(|_ctx| Err(AphelionError::validation("test error")));
 
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let graph = BuildGraph::default();
         let result = pipeline.execute(&ctx, graph);
@@ -1270,18 +1334,15 @@ mod tests {
     }
 
     #[test]
-    fn test_build_context_new_vs_struct_literal() {
+    fn test_build_context_new_method() {
         let backend = MockBackend;
         let trace_sink = MockTraceSink::new();
 
-        let ctx_new = BuildContext::new(&backend, &trace_sink);
-        let ctx_literal = BuildContext {
-            backend: &backend,
-            trace: &trace_sink,
-        };
+        let ctx1 = BuildContext::new(&backend, &trace_sink);
+        let ctx2 = BuildContext::new(&backend, &trace_sink);
 
-        assert_eq!(ctx_new.backend.name(), ctx_literal.backend.name());
-        assert_eq!(ctx_new.backend.device(), ctx_literal.backend.device());
+        assert_eq!(ctx1.backend.name(), ctx2.backend.name());
+        assert_eq!(ctx1.backend.device(), ctx2.backend.device());
     }
 
     #[test]
@@ -1299,10 +1360,7 @@ mod tests {
     #[test]
     fn test_training_pipeline_logs_start() {
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let mut graph = BuildGraph::default();
         let config = ModelConfig::new("test", "1.0");
@@ -1357,10 +1415,7 @@ mod tests {
     #[test]
     fn test_inference_pipeline_execution() {
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let mut graph = BuildGraph::default();
         let config = ModelConfig::new("test", "1.0");
@@ -1384,10 +1439,7 @@ mod tests {
     #[test]
     fn test_standard_pipeline_execution() {
         let trace_sink = MockTraceSink::new();
-        let ctx = BuildContext {
-            backend: &MockBackend,
-            trace: &trace_sink,
-        };
+        let ctx = BuildContext::new(&MockBackend, &trace_sink);
 
         let mut graph = BuildGraph::default();
         let config = ModelConfig::new("test", "1.0");
