@@ -1,3 +1,18 @@
+//! Aphelion Framework Examples
+//!
+//! This crate provides comprehensive examples demonstrating the usage of the aphelion-core framework.
+//! Each example focuses on a specific aspect of the framework:
+//!
+//! - `basic_usage`: Simple model building with BuildGraph and BuildPipeline
+//! - `custom_backend`: Implementing custom Backend trait with device capabilities
+//! - `pipeline_stages`: Creating custom PipelineStage implementations and composition
+//! - `validation`: Using validators to ensure configuration correctness
+
+pub mod basic_usage;
+pub mod custom_backend;
+pub mod pipeline_stages;
+pub mod validation;
+
 use aphelion_core::aphelion_model;
 use aphelion_core::backend::{Backend, NullBackend};
 use aphelion_core::config::ModelConfig;

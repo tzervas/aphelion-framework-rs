@@ -1,20 +1,67 @@
+//! Error types and result aliases for Aphelion operations.
+//!
+//! This module provides a unified error type (`AphelionError`) for all Aphelion operations,
+//! enabling consistent error handling across the framework. Errors are categorized by type
+//! to allow fine-grained error recovery and reporting.
+
 use std::io;
 use thiserror::Error;
 
+/// Unified error type for all Aphelion operations.
+///
+/// `AphelionError` encompasses all error conditions that can occur in the framework,
+/// from configuration issues to backend failures. Each variant is designed to provide
+/// clear error messages and categorization for debugging and user feedback.
+///
+/// # Variants
+///
+/// - `InvalidConfig(String)` - Configuration validation or parsing failed
+/// - `Backend(String)` - Backend initialization, availability, or operation failed
+/// - `Build(String)` - Model building or pipeline execution failed
+/// - `Validation(String)` - Data validation failed
+/// - `Serialization(String)` - JSON serialization or deserialization failed
+/// - `Io(String)` - File system or I/O operation failed
+/// - `Graph(String)` - Graph construction or validation failed (e.g., cycles detected)
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::error::{AphelionError, AphelionResult};
+///
+/// // Creating specific errors
+/// let config_error = AphelionError::InvalidConfig("missing field 'name'".to_string());
+/// let validation_error = AphelionError::validation("model version must be >= 1.0.0");
+///
+/// // Using in Result types
+/// fn validate_version(v: &str) -> AphelionResult<()> {
+///     if v.starts_with("v") {
+///         Err(AphelionError::InvalidConfig("version must not start with 'v'".to_string()))
+///     } else {
+///         Ok(())
+///     }
+/// }
+/// ```
 #[derive(Debug, Error)]
 pub enum AphelionError {
+    /// Configuration validation or parsing failed
     #[error("invalid configuration: {0}")]
     InvalidConfig(String),
+    /// Backend initialization, availability, or operation failed
     #[error("backend error: {0}")]
     Backend(String),
+    /// Model building or pipeline execution failed
     #[error("build error: {0}")]
     Build(String),
+    /// Data validation failed
     #[error("validation error: {0}")]
     Validation(String),
+    /// JSON serialization or deserialization failed
     #[error("serialization error: {0}")]
     Serialization(String),
+    /// File system or I/O operation failed
     #[error("io error: {0}")]
     Io(String),
+    /// Graph construction or validation failed
     #[error("graph error: {0}")]
     Graph(String),
 }
@@ -25,6 +72,21 @@ impl From<io::Error> for AphelionError {
     }
 }
 
+/// Result type alias for Aphelion operations.
+///
+/// All Aphelion operations that can fail return `AphelionResult<T>`, which is
+/// equivalent to `Result<T, AphelionError>`. This provides a consistent error
+/// handling interface throughout the framework.
+///
+/// # Examples
+///
+/// ```ignore
+/// use aphelion_core::error::AphelionResult;
+///
+/// fn build_model() -> AphelionResult<BuildGraph> {
+///     // ... implementation ...
+/// }
+/// ```
 pub type AphelionResult<T> = Result<T, AphelionError>;
 
 impl AphelionError {
