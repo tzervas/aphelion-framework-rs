@@ -178,7 +178,7 @@ impl NullBackend {
     /// # Examples
     ///
     /// ```
-    /// use aphelion_core::backend::NullBackend;
+    /// use aphelion_core::backend::{Backend, NullBackend};
     ///
     /// let backend = NullBackend::new("cpu");
     /// assert_eq!(backend.device(), "cpu");
@@ -194,7 +194,7 @@ impl NullBackend {
     /// # Examples
     ///
     /// ```
-    /// use aphelion_core::backend::NullBackend;
+    /// use aphelion_core::backend::{Backend, NullBackend};
     ///
     /// let backend = NullBackend::cpu();
     /// assert_eq!(backend.device(), "cpu");
@@ -231,13 +231,13 @@ impl Backend for NullBackend {
 /// # Examples
 ///
 /// ```
-/// use aphelion_core::backend::{BackendRegistry, NullBackend};
+/// use aphelion_core::backend::{BackendRegistry, MockBackend};
 ///
 /// let mut registry = BackendRegistry::new();
-/// registry.register(Box::new(NullBackend::cpu()));
-/// registry.register(Box::new(NullBackend::new("gpu")));
+/// registry.register(Box::new(MockBackend::new("cpu_backend", "cpu")));
+/// registry.register(Box::new(MockBackend::new("gpu_backend", "gpu")));
 ///
-/// assert!(registry.get("null").is_some());
+/// assert!(registry.get("cpu_backend").is_some());
 /// let available = registry.list_available();
 /// assert_eq!(available.len(), 2);
 /// ```
@@ -318,15 +318,15 @@ impl BackendRegistry {
     /// # Examples
     ///
     /// ```
-    /// use aphelion_core::backend::{BackendRegistry, NullBackend};
+    /// use aphelion_core::backend::{BackendRegistry, MockBackend};
     ///
     /// let mut registry = BackendRegistry::new();
-    /// registry.register(Box::new(NullBackend::cpu()));
-    /// registry.register(Box::new(NullBackend::new("gpu")));
+    /// registry.register(Box::new(MockBackend::new("cpu", "cpu")));
+    /// registry.register(Box::new(MockBackend::new("gpu", "gpu")));
     ///
     /// let available = registry.list_available();
     /// assert_eq!(available.len(), 2);
-    /// assert!(available.contains(&"null"));
+    /// assert!(available.contains(&"cpu"));
     /// ```
     pub fn list_available(&self) -> Vec<&str> {
         self.backends.keys().map(|k| k.as_str()).collect()
@@ -376,7 +376,7 @@ impl MockBackend {
     /// # Examples
     ///
     /// ```
-    /// use aphelion_core::backend::MockBackend;
+    /// use aphelion_core::backend::{Backend, MockBackend};
     ///
     /// let backend = MockBackend::new("test", "device");
     /// assert_eq!(backend.name(), "test");

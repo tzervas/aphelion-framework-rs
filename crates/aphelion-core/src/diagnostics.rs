@@ -4,6 +4,7 @@
 //! model building progress, debugging issues, and collecting performance metrics.
 //! Events are recorded through trait objects, enabling pluggable trace sinks.
 
+use serde::Serialize;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
@@ -25,7 +26,7 @@ use std::time::SystemTime;
 /// assert!(TraceLevel::Info < TraceLevel::Warn);
 /// assert!(TraceLevel::Warn < TraceLevel::Error);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum TraceLevel {
     /// Debug-level event (verbose, typically disabled in production)
     Debug,
@@ -66,7 +67,7 @@ pub enum TraceLevel {
 ///     trace_id: None,
 /// };
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TraceEvent {
     /// Unique event identifier
     pub id: String,
