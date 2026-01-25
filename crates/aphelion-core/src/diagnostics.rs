@@ -1,39 +1,195 @@
+//! Diagnostic and tracing infrastructure for model building.
+//!
+//! This module provides event recording and filtering capabilities for tracking
+//! model building progress, debugging issues, and collecting performance metrics.
+//! Events are recorded through trait objects, enabling pluggable trace sinks.
+
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
-/// Trace level for diagnostic events
+/// Severity level for trace events.
+///
+/// `TraceLevel` defines the severity of diagnostic events, allowing filtering
+/// and selective reporting based on importance.
+///
+/// # Ordering
+///
+/// Levels are ordered from least to most severe: Debug < Info < Warn < Error
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::diagnostics::TraceLevel;
+///
+/// assert!(TraceLevel::Debug < TraceLevel::Info);
+/// assert!(TraceLevel::Info < TraceLevel::Warn);
+/// assert!(TraceLevel::Warn < TraceLevel::Error);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TraceLevel {
+    /// Debug-level event (verbose, typically disabled in production)
     Debug,
+    /// Informational event (normal operation)
     Info,
+    /// Warning event (unexpected but recoverable)
     Warn,
+    /// Error event (failure or critical issue)
     Error,
 }
 
+/// A diagnostic event recorded during model building.
+///
+/// `TraceEvent` captures information about operations happening during model construction,
+/// including timing, severity level, and distributed tracing identifiers.
+///
+/// # Fields
+///
+/// * `id` - Unique event identifier
+/// * `message` - Event description
+/// * `timestamp` - When the event occurred
+/// * `level` - Severity level
+/// * `span_id` - Optional distributed tracing span identifier
+/// * `trace_id` - Optional distributed tracing trace identifier
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::diagnostics::{TraceEvent, TraceLevel};
+/// use std::time::SystemTime;
+///
+/// let event = TraceEvent {
+///     id: "build.start".to_string(),
+///     message: "starting model build".to_string(),
+///     timestamp: SystemTime::now(),
+///     level: TraceLevel::Info,
+///     span_id: Some("span-123".to_string()),
+///     trace_id: None,
+/// };
+/// ```
 #[derive(Debug, Clone)]
 pub struct TraceEvent {
+    /// Unique event identifier
     pub id: String,
+    /// Human-readable event description
     pub message: String,
+    /// Timestamp when the event occurred
     pub timestamp: SystemTime,
+    /// Severity level of the event
     pub level: TraceLevel,
+    /// Optional distributed tracing span identifier
     pub span_id: Option<String>,
+    /// Optional distributed tracing trace identifier
     pub trace_id: Option<String>,
 }
 
+/// Trait for recording trace events.
+///
+/// `TraceSink` defines the interface for consuming diagnostic events. Implementations
+/// handle event storage, filtering, export, or real-time monitoring.
+///
+/// # Implementing TraceSink
+///
+/// Types implementing `TraceSink` should be thread-safe (`Send + Sync`) and handle
+/// concurrent event recording from multiple threads.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::diagnostics::{TraceSink, TraceEvent, TraceLevel};
+/// use std::time::SystemTime;
+/// use std::sync::{Arc, Mutex};
+///
+/// struct CountingSink {
+///     count: Arc<Mutex<usize>>,
+/// }
+///
+/// impl TraceSink for CountingSink {
+///     fn record(&self, _event: TraceEvent) {
+///         *self.count.lock().unwrap() += 1;
+///     }
+/// }
+/// ```
 pub trait TraceSink: Send + Sync {
+    /// Records a trace event.
+    ///
+    /// # Arguments
+    ///
+    /// * `event` - The trace event to record
     fn record(&self, event: TraceEvent);
 }
 
+/// An in-memory trace sink that stores all recorded events.
+///
+/// `InMemoryTraceSink` is useful for testing, debugging, and analysis of build processes.
+/// All events are stored in memory and can be retrieved as a vector.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::diagnostics::{InMemoryTraceSink, TraceSink, TraceEvent, TraceLevel};
+/// use std::time::SystemTime;
+///
+/// let sink = InMemoryTraceSink::new();
+/// let event = TraceEvent {
+///     id: "test".to_string(),
+///     message: "test event".to_string(),
+///     timestamp: SystemTime::now(),
+///     level: TraceLevel::Info,
+///     span_id: None,
+///     trace_id: None,
+/// };
+///
+/// sink.record(event);
+/// let events = sink.events();
+/// assert_eq!(events.len(), 1);
+/// ```
 #[derive(Default, Clone)]
 pub struct InMemoryTraceSink {
     events: Arc<Mutex<Vec<TraceEvent>>>,
 }
 
 impl InMemoryTraceSink {
+    /// Creates a new empty in-memory trace sink.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::diagnostics::InMemoryTraceSink;
+    ///
+    /// let sink = InMemoryTraceSink::new();
+    /// assert_eq!(sink.events().len(), 0);
+    /// ```
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Retrieves a copy of all recorded events.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing clones of all recorded events
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::diagnostics::{InMemoryTraceSink, TraceSink, TraceEvent, TraceLevel};
+    /// use std::time::SystemTime;
+    ///
+    /// let sink = InMemoryTraceSink::new();
+    /// let event = TraceEvent {
+    ///     id: "event1".to_string(),
+    ///     message: "first event".to_string(),
+    ///     timestamp: SystemTime::now(),
+    ///     level: TraceLevel::Debug,
+    ///     span_id: None,
+    ///     trace_id: None,
+    /// };
+    /// sink.record(event);
+    ///
+    /// let events = sink.events();
+    /// assert_eq!(events.len(), 1);
+    /// assert_eq!(events[0].id, "event1");
+    /// ```
     pub fn events(&self) -> Vec<TraceEvent> {
         match self.events.lock() {
             Ok(guard) => guard.clone(),
@@ -51,7 +207,44 @@ impl TraceSink for InMemoryTraceSink {
     }
 }
 
-/// Filters trace events by minimum level
+/// Filters trace events by minimum severity level.
+///
+/// `TraceFilter` wraps another trace sink and only records events that meet
+/// the minimum severity threshold. This enables efficient filtering without
+/// creating filtered copies of events.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::diagnostics::{TraceFilter, InMemoryTraceSink, TraceSink, TraceEvent, TraceLevel};
+/// use std::sync::Arc;
+/// use std::time::SystemTime;
+///
+/// let inner_sink = Arc::new(InMemoryTraceSink::new());
+/// let filter = TraceFilter::new(TraceLevel::Warn, inner_sink.clone());
+///
+/// // Debug event will be filtered out
+/// filter.record(TraceEvent {
+///     id: "debug".to_string(),
+///     message: "debug info".to_string(),
+///     timestamp: SystemTime::now(),
+///     level: TraceLevel::Debug,
+///     span_id: None,
+///     trace_id: None,
+/// });
+///
+/// // Error event will pass through
+/// filter.record(TraceEvent {
+///     id: "error".to_string(),
+///     message: "error info".to_string(),
+///     timestamp: SystemTime::now(),
+///     level: TraceLevel::Error,
+///     span_id: None,
+///     trace_id: None,
+/// });
+///
+/// assert_eq!(inner_sink.events().len(), 1);
+/// ```
 #[derive(Clone)]
 pub struct TraceFilter {
     min_level: TraceLevel,
@@ -59,6 +252,12 @@ pub struct TraceFilter {
 }
 
 impl TraceFilter {
+    /// Creates a new trace filter with the given minimum level.
+    ///
+    /// # Arguments
+    ///
+    /// * `min_level` - Only events with severity >= this level will be recorded
+    /// * `sink` - The underlying sink to forward filtered events to
     pub fn new(min_level: TraceLevel, sink: Arc<dyn TraceSink>) -> Self {
         Self { min_level, sink }
     }
@@ -72,13 +271,57 @@ impl TraceSink for TraceFilter {
     }
 }
 
-/// Forwards trace events to multiple sinks
+/// Forwards trace events to multiple sinks simultaneously.
+///
+/// `MultiSink` distributes each recorded event to all registered sinks,
+/// enabling simultaneous logging to multiple outputs (e.g., file, memory, remote).
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::diagnostics::{MultiSink, InMemoryTraceSink, TraceSink, TraceEvent, TraceLevel};
+/// use std::sync::Arc;
+/// use std::time::SystemTime;
+///
+/// let sink1 = Arc::new(InMemoryTraceSink::new());
+/// let sink2 = Arc::new(InMemoryTraceSink::new());
+/// let multi = MultiSink::new(vec![sink1.clone(), sink2.clone()]);
+///
+/// let event = TraceEvent {
+///     id: "event1".to_string(),
+///     message: "test".to_string(),
+///     timestamp: SystemTime::now(),
+///     level: TraceLevel::Info,
+///     span_id: None,
+///     trace_id: None,
+/// };
+///
+/// multi.record(event);
+/// assert_eq!(sink1.events().len(), 1);
+/// assert_eq!(sink2.events().len(), 1);
+/// ```
 #[derive(Clone)]
 pub struct MultiSink {
     sinks: Arc<Vec<Arc<dyn TraceSink>>>,
 }
 
 impl MultiSink {
+    /// Creates a new multi-sink from a vector of trace sinks.
+    ///
+    /// # Arguments
+    ///
+    /// * `sinks` - Vector of trace sinks to forward events to
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::diagnostics::{MultiSink, InMemoryTraceSink};
+    /// use std::sync::Arc;
+    ///
+    /// let sink1 = Arc::new(InMemoryTraceSink::new());
+    /// let sink2 = Arc::new(InMemoryTraceSink::new());
+    /// let multi = MultiSink::new(vec![sink1, sink2]);
+    /// ```
     pub fn new(sinks: Vec<Arc<dyn TraceSink>>) -> Self {
         Self {
             sinks: Arc::new(sinks),

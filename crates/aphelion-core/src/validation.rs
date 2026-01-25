@@ -1,13 +1,53 @@
+//! Configuration validation types and validators.
+//!
+//! This module provides a validation framework for model configurations, including
+//! validators for common fields like name and version, and support for composing
+//! multiple validators.
+
 use crate::config::ModelConfig;
 
-/// Represents a validation error with a field name and error message.
+/// A validation error with field-level context.
+///
+/// `ValidationError` represents a single validation failure, including the field
+/// that failed validation and a descriptive error message.
+///
+/// # Fields
+///
+/// * `field` - The configuration field that failed validation
+/// * `message` - Descriptive error message
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::validation::ValidationError;
+///
+/// let error = ValidationError::new("name", "Name cannot be empty");
+/// assert_eq!(error.field, "name");
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct ValidationError {
+    /// The field that failed validation
     pub field: String,
+    /// Error message describing the validation failure
     pub message: String,
 }
 
 impl ValidationError {
+    /// Creates a new validation error.
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - The field name that failed validation
+    /// * `message` - Descriptive error message
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::validation::ValidationError;
+    ///
+    /// let error = ValidationError::new("version", "Version must be semantic");
+    /// assert_eq!(error.field, "version");
+    /// ```
     pub fn new(field: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             field: field.into(),
@@ -25,11 +65,68 @@ impl std::fmt::Display for ValidationError {
 impl std::error::Error for ValidationError {}
 
 /// Trait for validating model configurations.
+///
+/// `ConfigValidator` defines the interface for configuration validation. Implementations
+/// check configurations for semantic correctness and return all validation errors at once,
+/// enabling comprehensive error reporting.
+///
+/// # Implementing ConfigValidator
+///
+/// Types implementing `ConfigValidator` must be thread-safe (`Send + Sync`) and return
+/// all validation errors found, not just the first one.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::validation::{ConfigValidator, ValidationError};
+/// use aphelion_core::config::ModelConfig;
+///
+/// struct CustomValidator;
+///
+/// impl ConfigValidator for CustomValidator {
+///     fn validate(&self, config: &ModelConfig) -> Result<(), Vec<ValidationError>> {
+///         if config.name.contains(" ") {
+///             Err(vec![ValidationError::new("name", "Name cannot contain spaces")])
+///         } else {
+///             Ok(())
+///         }
+///     }
+/// }
+/// ```
 pub trait ConfigValidator: Send + Sync {
+    /// Validates the configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The configuration to validate
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if validation succeeds, or `Err(errors)` with all validation failures
     fn validate(&self, config: &ModelConfig) -> Result<(), Vec<ValidationError>>;
 }
 
-/// Validates that the model name is non-empty and contains only alphanumeric characters, dashes, and underscores.
+/// Validates model names.
+///
+/// `NameValidator` ensures that model names are non-empty and contain only
+/// alphanumeric characters, dashes, and underscores.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::validation::{NameValidator, ConfigValidator};
+/// use aphelion_core::config::ModelConfig;
+///
+/// let validator = NameValidator;
+///
+/// // Valid
+/// let config = ModelConfig::new("my-model_v1", "1.0.0");
+/// assert!(validator.validate(&config).is_ok());
+///
+/// // Invalid
+/// let config = ModelConfig::new("invalid@name", "1.0.0");
+/// assert!(validator.validate(&config).is_err());
+/// ```
 pub struct NameValidator;
 
 impl ConfigValidator for NameValidator {
@@ -53,7 +150,27 @@ impl ConfigValidator for NameValidator {
     }
 }
 
-/// Validates that the version matches semantic versioning pattern (e.g., 1.2.3).
+/// Validates semantic versioning format.
+///
+/// `VersionValidator` ensures that version strings match semantic versioning format
+/// (e.g., 1.2.3, with at least major.minor.patch).
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::validation::{VersionValidator, ConfigValidator};
+/// use aphelion_core::config::ModelConfig;
+///
+/// let validator = VersionValidator;
+///
+/// // Valid
+/// let config = ModelConfig::new("model", "1.2.3");
+/// assert!(validator.validate(&config).is_ok());
+///
+/// // Invalid
+/// let config = ModelConfig::new("model", "1.2");
+/// assert!(validator.validate(&config).is_err());
+/// ```
 pub struct VersionValidator;
 
 impl ConfigValidator for VersionValidator {
@@ -77,7 +194,9 @@ impl ConfigValidator for VersionValidator {
     }
 }
 
-/// Validates that a version string matches semantic versioning pattern.
+/// Checks if a version string matches semantic versioning pattern.
+///
+/// A valid semver has at least three numeric components separated by dots (e.g., 1.2.3).
 fn is_valid_semver(version: &str) -> bool {
     let parts: Vec<&str> = version.split('.').collect();
     if parts.len() < 3 {
@@ -87,18 +206,65 @@ fn is_valid_semver(version: &str) -> bool {
     parts.iter().take(3).all(|part| part.parse::<u32>().is_ok())
 }
 
-/// Combines multiple validators into a single validator.
+/// Composes multiple validators into a single validator.
+///
+/// `CompositeValidator` runs all registered validators and collects all errors,
+/// providing comprehensive validation that checks all constraints.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::validation::{CompositeValidator, ConfigValidator, NameValidator, VersionValidator};
+/// use aphelion_core::config::ModelConfig;
+///
+/// let validator = CompositeValidator::new()
+///     .add(Box::new(NameValidator))
+///     .add(Box::new(VersionValidator));
+///
+/// // Valid
+/// let config = ModelConfig::new("my-model", "1.0.0");
+/// assert!(validator.validate(&config).is_ok());
+///
+/// // Invalid - both errors collected
+/// let config = ModelConfig::new("", "");
+/// let result = validator.validate(&config);
+/// assert!(result.is_err());
+/// assert_eq!(result.unwrap_err().len(), 2);
+/// ```
 pub struct CompositeValidator {
     validators: Vec<Box<dyn ConfigValidator>>,
 }
 
 impl CompositeValidator {
+    /// Creates a new composite validator with no sub-validators.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::validation::CompositeValidator;
+    ///
+    /// let validator = CompositeValidator::new();
+    /// ```
     pub fn new() -> Self {
         Self {
             validators: Vec::new(),
         }
     }
 
+    /// Adds a validator to the composite.
+    ///
+    /// # Arguments
+    ///
+    /// * `validator` - The validator to add
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::validation::{CompositeValidator, NameValidator};
+    ///
+    /// let validator = CompositeValidator::new()
+    ///     .add(Box::new(NameValidator));
+    /// ```
     pub fn add(mut self, validator: Box<dyn ConfigValidator>) -> Self {
         self.validators.push(validator);
         self

@@ -1,3 +1,9 @@
+//! Build pipeline orchestration and stage management.
+//!
+//! This module provides the infrastructure for defining and executing multi-stage
+//! build pipelines with support for hooks, progress tracking, and stage skipping.
+//! The pipeline architecture enables composable, reusable build processes.
+
 use crate::backend::{Backend, ModelBuilder};
 use crate::config::{ConfigSpec, ModelConfig};
 use crate::diagnostics::{TraceEvent, TraceLevel, TraceSink};
@@ -6,24 +12,119 @@ use crate::graph::BuildGraph;
 use std::collections::HashSet;
 use std::time::SystemTime;
 
-/// Build context containing backend + trace sink.
+/// Execution context containing backend and tracing infrastructure.
+///
+/// `BuildContext` provides the runtime environment for pipeline stages and builders.
+/// It supplies both the computational backend and the tracing sink for recording events.
+///
+/// # Fields
+///
+/// * `backend` - The computational backend to use for operations
+/// * `trace` - The trace sink for recording diagnostic events
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::pipeline::BuildContext;
+/// use aphelion_core::backend::NullBackend;
+/// use aphelion_core::diagnostics::InMemoryTraceSink;
+///
+/// let backend = NullBackend::cpu();
+/// let trace = InMemoryTraceSink::new();
+///
+/// let ctx = BuildContext {
+///     backend: &backend,
+///     trace: &trace,
+/// };
+/// ```
 pub struct BuildContext<'a> {
+    /// The computational backend
     pub backend: &'a dyn Backend,
+    /// The trace sink for recording events
     pub trace: &'a dyn TraceSink,
 }
 
-/// A trait for pipeline stages that can be executed in sequence.
+/// Trait for composable pipeline stages.
+///
+/// `PipelineStage` defines the interface for individual stages in a build pipeline.
+/// Stages are executed sequentially, each receiving the output of the previous stage,
+/// enabling composable, modular build processes.
+///
+/// # Implementing PipelineStage
+///
+/// Types implementing `PipelineStage` must be thread-safe (`Send + Sync`) and
+/// deterministic - running the same stage with the same inputs should produce
+/// the same outputs.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::pipeline::{PipelineStage, BuildContext};
+/// use aphelion_core::graph::BuildGraph;
+/// use aphelion_core::error::AphelionResult;
+///
+/// struct LoggingStage;
+///
+/// impl PipelineStage for LoggingStage {
+///     fn name(&self) -> &str {
+///         "logging"
+///     }
+///
+///     fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()> {
+///         // Implementation here
+///         Ok(())
+///     }
+/// }
+/// ```
 pub trait PipelineStage: Send + Sync {
-    /// Returns the name of this stage.
+    /// Returns the name of this stage for logging and identification.
+    ///
+    /// Stage names are used in progress reporting and error messages, so they
+    /// should be descriptive and unique within a pipeline.
     fn name(&self) -> &str;
 
-    /// Execute this stage with the given build context and graph.
+    /// Executes this stage with the given context and graph.
+    ///
+    /// The stage receives a mutable reference to the graph, allowing it to
+    /// modify the graph in-place (adding nodes, edges, metadata, etc.).
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The build context with backend and trace sink
+    /// * `graph` - The computation graph being built
+    ///
+    /// # Errors
+    ///
+    /// Returns `AphelionResult::Err` if the stage fails.
     fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()>;
 }
 
-/// Pre and post build hooks for pipeline execution.
+/// Lifecycle hooks for pipeline execution.
+///
+/// `PipelineHooks` allows registering callbacks that execute before and after
+/// the main pipeline stages. Pre-build hooks execute before any stages, and
+/// post-build hooks execute after all stages complete successfully.
+///
+/// # Fields
+///
+/// * `pre_build` - Callbacks to execute before stages
+/// * `post_build` - Callbacks to execute after stages
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::pipeline::PipelineHooks;
+/// use aphelion_core::pipeline::BuildContext;
+/// use aphelion_core::backend::NullBackend;
+/// use aphelion_core::diagnostics::InMemoryTraceSink;
+///
+/// let mut hooks = PipelineHooks::default();
+/// // Can add hooks here
+/// ```
 pub struct PipelineHooks {
+    /// Callbacks to execute before any pipeline stages
     pub pre_build: Vec<Box<dyn Fn(&BuildContext) -> AphelionResult<()> + Send + Sync>>,
+    /// Callbacks to execute after all pipeline stages
     pub post_build: Vec<Box<dyn Fn(&BuildContext, &BuildGraph) -> AphelionResult<()> + Send + Sync>>,
 }
 
@@ -36,7 +137,41 @@ impl Default for PipelineHooks {
     }
 }
 
-/// A build pipeline that can be extended with stages, hooks, and progress callbacks.
+/// An extensible build pipeline for composing model construction stages.
+///
+/// `BuildPipeline` orchestrates the execution of multiple stages, hooks, and progress callbacks.
+/// Stages are executed in order, with support for selective stage skipping and progress reporting.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::pipeline::{BuildPipeline, ValidationStage, HashingStage};
+/// use aphelion_core::backend::NullBackend;
+/// use aphelion_core::diagnostics::InMemoryTraceSink;
+/// use aphelion_core::pipeline::BuildContext;
+/// use aphelion_core::graph::BuildGraph;
+/// use aphelion_core::config::ModelConfig;
+///
+/// let mut graph = BuildGraph::default();
+/// graph.add_node("test", ModelConfig::new("model", "1.0.0"));
+///
+/// let pipeline = BuildPipeline::new()
+///     .with_stage(Box::new(ValidationStage))
+///     .with_stage(Box::new(HashingStage))
+///     .with_progress(|name, current, total| {
+///         println!("Stage {} ({}/{})", name, current, total);
+///     });
+///
+/// let backend = NullBackend::cpu();
+/// let trace = InMemoryTraceSink::new();
+/// let ctx = BuildContext {
+///     backend: &backend,
+///     trace: &trace,
+/// };
+///
+/// let result = pipeline.execute(&ctx, graph);
+/// assert!(result.is_ok());
+/// ```
 pub struct BuildPipeline {
     stages: Vec<Box<dyn PipelineStage>>,
     hooks: PipelineHooks,
@@ -51,7 +186,19 @@ impl Default for BuildPipeline {
 }
 
 impl BuildPipeline {
-    /// Create a new empty pipeline.
+    /// Creates a new empty pipeline.
+    ///
+    /// The pipeline starts with no stages, hooks, or progress callbacks.
+    /// Use the builder methods to configure it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::new();
+    /// // Configure pipeline...
+    /// ```
     pub fn new() -> Self {
         Self {
             stages: Vec::new(),
@@ -61,13 +208,47 @@ impl BuildPipeline {
         }
     }
 
-    /// Add a stage to the pipeline.
+    /// Adds a stage to the pipeline.
+    ///
+    /// Stages are executed in the order they are added.
+    ///
+    /// # Arguments
+    ///
+    /// * `stage` - The stage to add
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::pipeline::{BuildPipeline, ValidationStage};
+    ///
+    /// let pipeline = BuildPipeline::new()
+    ///     .with_stage(Box::new(ValidationStage));
+    /// ```
     pub fn with_stage(mut self, stage: Box<dyn PipelineStage>) -> Self {
         self.stages.push(stage);
         self
     }
 
-    /// Add a pre-build hook.
+    /// Adds a pre-build hook.
+    ///
+    /// Pre-build hooks execute before any stages. If a hook returns an error,
+    /// the pipeline stops execution.
+    ///
+    /// # Arguments
+    ///
+    /// * `hook` - Closure to execute before stages
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::new()
+    ///     .with_pre_hook(|ctx| {
+    ///         println!("Starting build");
+    ///         Ok(())
+    ///     });
+    /// ```
     pub fn with_pre_hook<F>(mut self, hook: F) -> Self
     where
         F: Fn(&BuildContext) -> AphelionResult<()> + Send + Sync + 'static,
@@ -76,7 +257,13 @@ impl BuildPipeline {
         self
     }
 
-    /// Add a post-build hook.
+    /// Adds a post-build hook.
+    ///
+    /// Post-build hooks execute after all stages complete successfully.
+    ///
+    /// # Arguments
+    ///
+    /// * `hook` - Closure to execute after stages
     pub fn with_post_hook<F>(mut self, hook: F) -> Self
     where
         F: Fn(&BuildContext, &BuildGraph) -> AphelionResult<()> + Send + Sync + 'static,
@@ -85,13 +272,44 @@ impl BuildPipeline {
         self
     }
 
-    /// Skip a stage by name.
+    /// Skips a stage by name during execution.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the stage to skip
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::new()
+    ///     .with_skip_stage("validation");
+    /// ```
     pub fn with_skip_stage(mut self, name: impl Into<String>) -> Self {
         self.skip_stages.insert(name.into());
         self
     }
 
-    /// Set a progress callback function.
+    /// Sets a progress callback for monitoring pipeline execution.
+    ///
+    /// The callback is invoked for each stage with the stage name, current position,
+    /// and total number of stages. Skipped stages are still reported.
+    ///
+    /// # Arguments
+    ///
+    /// * `callback` - Closure receiving (stage_name, current_position, total_stages)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::new()
+    ///     .with_progress(|name, current, total| {
+    ///         println!("Progress: {}/{} - {}", current, total, name);
+    ///     });
+    /// ```
     pub fn with_progress<F>(mut self, callback: F) -> Self
     where
         F: Fn(&str, usize, usize) + Send + Sync + 'static,
@@ -100,7 +318,23 @@ impl BuildPipeline {
         self
     }
 
-    /// Execute the pipeline with stages.
+    /// Executes the pipeline with all configured stages.
+    ///
+    /// Executes pre-build hooks, then all stages in order (skipping as configured),
+    /// then post-build hooks. Returns the final graph if successful.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The build context
+    /// * `graph` - The initial computation graph
+    ///
+    /// # Returns
+    ///
+    /// The final graph after all stages, or an error if any stage fails
+    ///
+    /// # Errors
+    ///
+    /// Returns `AphelionResult::Err` if any hook or stage returns an error.
     pub fn execute(
         &self,
         ctx: &BuildContext<'_>,
@@ -141,6 +375,24 @@ impl BuildPipeline {
         Ok(graph)
     }
 
+    /// Builds a model using the pipeline.
+    ///
+    /// Delegates to the model builder's `build` method and logs lifecycle events.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - The model to build
+    /// * `ctx` - The build context
+    ///
+    /// # Returns
+    ///
+    /// The constructed build graph
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let graph = BuildPipeline::build(&my_model, ctx)?;
+    /// ```
     pub fn build<M: ModelBuilder<Output = BuildGraph>>(
         model: &M,
         ctx: BuildContext<'_>,
@@ -168,6 +420,24 @@ impl BuildPipeline {
         Ok(graph)
     }
 
+    /// Builds a model after validating its configuration.
+    ///
+    /// Validates that the model's configuration has non-empty name and version before building.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - The model to build (must implement ConfigSpec)
+    /// * `ctx` - The build context
+    ///
+    /// # Errors
+    ///
+    /// Returns `AphelionError::InvalidConfig` if the configuration is invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let graph = BuildPipeline::build_with_validation(&my_model, ctx)?;
+    /// ```
     pub fn build_with_validation<M>(
         model: &M,
         ctx: BuildContext<'_>,
@@ -200,7 +470,33 @@ impl BuildPipeline {
     }
 }
 
-/// A validation stage that validates the build graph configuration.
+/// A pipeline stage that validates the build graph structure.
+///
+/// `ValidationStage` ensures that the graph has at least one node, preventing
+/// errors from empty graphs.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::pipeline::{ValidationStage, PipelineStage, BuildContext};
+/// use aphelion_core::backend::NullBackend;
+/// use aphelion_core::diagnostics::InMemoryTraceSink;
+/// use aphelion_core::graph::BuildGraph;
+/// use aphelion_core::config::ModelConfig;
+///
+/// let mut graph = BuildGraph::default();
+/// graph.add_node("test", ModelConfig::new("model", "1.0.0"));
+///
+/// let stage = ValidationStage;
+/// let backend = NullBackend::cpu();
+/// let trace = InMemoryTraceSink::new();
+/// let ctx = BuildContext {
+///     backend: &backend,
+///     trace: &trace,
+/// };
+///
+/// assert!(stage.execute(&ctx, &mut graph).is_ok());
+/// ```
 pub struct ValidationStage;
 
 impl PipelineStage for ValidationStage {
@@ -228,7 +524,35 @@ impl PipelineStage for ValidationStage {
     }
 }
 
-/// A hashing stage that computes and logs the graph hash.
+/// A pipeline stage that computes and traces the graph's stable hash.
+///
+/// `HashingStage` computes a deterministic hash of the graph for traceability,
+/// caching, and reproducibility verification.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::pipeline::{HashingStage, PipelineStage, BuildContext};
+/// use aphelion_core::backend::NullBackend;
+/// use aphelion_core::diagnostics::InMemoryTraceSink;
+/// use aphelion_core::graph::BuildGraph;
+/// use aphelion_core::config::ModelConfig;
+///
+/// let mut graph = BuildGraph::default();
+/// graph.add_node("test", ModelConfig::new("model", "1.0.0"));
+///
+/// let stage = HashingStage;
+/// let backend = NullBackend::cpu();
+/// let trace = InMemoryTraceSink::new();
+/// let ctx = BuildContext {
+///     backend: &backend,
+///     trace: &trace,
+/// };
+///
+/// assert!(stage.execute(&ctx, &mut graph).is_ok());
+/// let events = trace.events();
+/// assert!(events.iter().any(|e| e.message.contains("computed graph hash")));
+/// ```
 pub struct HashingStage;
 
 impl PipelineStage for HashingStage {

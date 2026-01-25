@@ -1,16 +1,60 @@
+//! Export and serialization of trace events.
+//!
+//! This module provides JSON serialization and export capabilities for diagnostic
+//! events, enabling integration with external logging and analysis tools.
+
 use crate::diagnostics::{TraceEvent, TraceSink};
 use serde::Serialize;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 
-/// Serializable representation of a TraceEvent
+/// JSON-serializable representation of a trace event.
+///
+/// `SerializableTraceEvent` converts the internal `TraceEvent` type to a format
+/// suitable for JSON serialization and external processing.
+///
+/// # Fields
+///
+/// * `id` - Event identifier
+/// * `message` - Event description
+/// * `timestamp` - Timestamp as a string (seconds since UNIX_EPOCH)
+/// * `level` - Severity level as a string ("DEBUG", "INFO", "WARN", "ERROR")
+/// * `span_id` - Optional distributed tracing span identifier
+/// * `trace_id` - Optional distributed tracing trace identifier
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::export::SerializableTraceEvent;
+/// use aphelion_core::diagnostics::{TraceEvent, TraceLevel};
+/// use std::time::SystemTime;
+///
+/// let event = TraceEvent {
+///     id: "test".to_string(),
+///     message: "test event".to_string(),
+///     timestamp: SystemTime::now(),
+///     level: TraceLevel::Info,
+///     span_id: None,
+///     trace_id: None,
+/// };
+///
+/// let serializable = SerializableTraceEvent::from(&event);
+/// assert_eq!(serializable.id, "test");
+/// assert_eq!(serializable.level, "INFO");
+/// ```
 #[derive(Debug, Clone, Serialize)]
 pub struct SerializableTraceEvent {
+    /// Event identifier
     pub id: String,
+    /// Event description
     pub message: String,
+    /// Timestamp as string
     pub timestamp: String,
+    /// Severity level
     pub level: String,
+    /// Optional span identifier
     pub span_id: Option<String>,
+    /// Optional trace identifier
     pub trace_id: Option<String>,
 }
 
@@ -40,19 +84,82 @@ impl From<&TraceEvent> for SerializableTraceEvent {
     }
 }
 
-/// JSON exporter for trace events
+/// A trace sink that records events and exports them as JSON.
+///
+/// `JsonExporter` collects trace events and provides JSON serialization for
+/// external processing, logging, or analysis. It implements `TraceSink` to work
+/// with the pipeline infrastructure.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::export::JsonExporter;
+/// use aphelion_core::diagnostics::{TraceSink, TraceEvent, TraceLevel};
+/// use std::time::SystemTime;
+///
+/// let exporter = JsonExporter::new();
+/// let event = TraceEvent {
+///     id: "test".to_string(),
+///     message: "test event".to_string(),
+///     timestamp: SystemTime::now(),
+///     level: TraceLevel::Info,
+///     span_id: None,
+///     trace_id: None,
+/// };
+///
+/// exporter.record(event);
+/// let json = exporter.to_json();
+/// assert!(json.contains("test"));
+/// ```
 pub struct JsonExporter {
     events: Arc<Mutex<Vec<TraceEvent>>>,
 }
 
 impl JsonExporter {
+    /// Creates a new JSON exporter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::export::JsonExporter;
+    ///
+    /// let exporter = JsonExporter::new();
+    /// ```
     pub fn new() -> Self {
         Self {
             events: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    /// Convert all recorded events to JSON string
+    /// Converts all recorded events to a JSON string.
+    ///
+    /// Events are serialized in array format with all metadata preserved.
+    ///
+    /// # Returns
+    ///
+    /// A JSON array string, or "[]" if serialization fails
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::export::JsonExporter;
+    /// use aphelion_core::diagnostics::{TraceSink, TraceEvent, TraceLevel};
+    /// use std::time::SystemTime;
+    ///
+    /// let exporter = JsonExporter::new();
+    /// let event = TraceEvent {
+    ///     id: "event1".to_string(),
+    ///     message: "first event".to_string(),
+    ///     timestamp: SystemTime::now(),
+    ///     level: TraceLevel::Debug,
+    ///     span_id: None,
+    ///     trace_id: None,
+    /// };
+    /// exporter.record(event);
+    ///
+    /// let json = exporter.to_json();
+    /// assert!(json.contains("event1"));
+    /// ```
     pub fn to_json(&self) -> String {
         match self.events.lock() {
             Ok(guard) => {
@@ -69,7 +176,42 @@ impl JsonExporter {
         }
     }
 
-    /// Write all recorded events as JSON to a writer
+    /// Writes all recorded events as JSON to a writer.
+    ///
+    /// Serializes all events to JSON and writes them to the provided writer,
+    /// useful for writing to files or network streams.
+    ///
+    /// # Arguments
+    ///
+    /// * `writer` - The writer to write JSON to
+    ///
+    /// # Errors
+    ///
+    /// Returns `io::Error` if the write operation fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::export::JsonExporter;
+    /// use aphelion_core::diagnostics::{TraceSink, TraceEvent, TraceLevel};
+    /// use std::time::SystemTime;
+    ///
+    /// let exporter = JsonExporter::new();
+    /// let event = TraceEvent {
+    ///     id: "write_test".to_string(),
+    ///     message: "test write".to_string(),
+    ///     timestamp: SystemTime::now(),
+    ///     level: TraceLevel::Info,
+    ///     span_id: None,
+    ///     trace_id: None,
+    /// };
+    /// exporter.record(event);
+    ///
+    /// let mut buffer = Vec::new();
+    /// assert!(exporter.write_to(&mut buffer).is_ok());
+    /// let json_string = String::from_utf8(buffer).unwrap();
+    /// assert!(json_string.contains("write_test"));
+    /// ```
     pub fn write_to<W: Write>(&self, mut writer: W) -> io::Result<()> {
         let json = self.to_json();
         writer.write_all(json.as_bytes())?;
