@@ -8,7 +8,6 @@ members = [
 ]
 
 [workspace.package]
-name = "aphelion-framework-rs"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
@@ -23,12 +22,11 @@ tracing = "0.1"
 sha2 = "0.10"
 hex = "0.4"
 
-# Optional ecosystem dependencies (feature-gated in aphelion-core)
-rust-ai-core = { version = "0.1", optional = true }
-burn = { version = "0.13", optional = true }
-cubecl = { version = "0.2", optional = true }
-
 # Proc-macro dependencies
 syn = { version = "2", features = ["full", "extra-traits"] }
 quote = "1"
 proc-macro2 = "1"
+
+# Ecosystem dependencies (feature-gated, versions for when available)
+# burn = "0.16"      # TODO: Enable when burn integration is ready
+# cubecl = "0.4"     # TODO: Enable when cubecl integration is ready

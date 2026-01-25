@@ -6,6 +6,10 @@ license = { workspace = true }
 authors = { workspace = true }
 repository = { workspace = true }
 
+[features]
+default = []
+burn = ["aphelion-core/burn"]
+
 [dependencies]
 aphelion-core = { path = "../aphelion-core" }
 serde_json = { workspace = true }

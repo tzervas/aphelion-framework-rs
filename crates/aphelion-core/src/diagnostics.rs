@@ -25,7 +25,7 @@ impl InMemoryTraceSink {
     pub fn events(&self) -> Vec<TraceEvent> {
         match self.events.lock() {
             Ok(guard) => guard.clone(),
-            Err(poisoned) => poisoned.into_inner(),
+            Err(poisoned) => poisoned.into_inner().clone(),
         }
     }
 }
