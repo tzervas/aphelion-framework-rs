@@ -10,7 +10,9 @@ publish = false
 [features]
 default = []
 burn = ["aphelion-core/burn"]
+cubecl = ["aphelion-core/cubecl"]
 tokio = ["aphelion-core/tokio", "dep:tokio"]
+tritter-accel = ["aphelion-core/tritter-accel"]
 
 [dependencies]
 aphelion-core = { path = "../aphelion-core" }

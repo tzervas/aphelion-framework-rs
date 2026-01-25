@@ -988,6 +988,353 @@ mod tests {
         );
     }
 
+    // ============================================================================
+    // TRITTER-ACCEL INTEGRATION TESTS
+    // ============================================================================
+
+    #[cfg(feature = "tritter-accel")]
+    mod tritter_accel_tests {
+        use super::*;
+        use aphelion_core::acceleration::{
+            AccelerationStage, InferenceAccelConfig, TrainingAccelConfig,
+            gradient_compression_post_hook, gradient_compression_pre_hook,
+            inference_pipeline, training_pipeline,
+        };
+        use aphelion_core::tritter_backend::{
+            TriterAccelBackend, TriterDevice, TrainingConfig, InferenceConfig,
+        };
+
+        #[test]
+        fn tritter_backend_cpu_creation() {
+            let backend = TriterAccelBackend::cpu();
+            assert_eq!(backend.name(), "tritter-accel");
+            assert_eq!(backend.device(), "cpu");
+            assert!(backend.is_available());
+        }
+
+        #[test]
+        fn tritter_backend_cuda_creation() {
+            let backend = TriterAccelBackend::cuda(0);
+            assert_eq!(backend.name(), "tritter-accel");
+            assert_eq!(backend.device(), "cuda:0");
+        }
+
+        #[test]
+        fn tritter_backend_training_mode() {
+            let backend = TriterAccelBackend::cpu().with_training_mode(0.1);
+            assert!(backend.is_training_mode());
+            assert!(!backend.is_inference_mode());
+
+            let config = backend.training_config().unwrap();
+            assert!((config.compression_ratio - 0.1).abs() < f32::EPSILON);
+        }
+
+        #[test]
+        fn tritter_backend_inference_mode() {
+            let backend = TriterAccelBackend::cpu().with_inference_mode(32);
+            assert!(!backend.is_training_mode());
+            assert!(backend.is_inference_mode());
+
+            let config = backend.inference_config().unwrap();
+            assert_eq!(config.batch_size, 32);
+        }
+
+        #[test]
+        fn tritter_backend_lifecycle() {
+            let mut backend = TriterAccelBackend::cpu();
+            assert!(!backend.is_initialized());
+
+            let init_result = backend.initialize();
+            assert!(init_result.is_ok());
+            assert!(backend.is_initialized());
+
+            let shutdown_result = backend.shutdown();
+            assert!(shutdown_result.is_ok());
+            assert!(!backend.is_initialized());
+        }
+
+        #[test]
+        fn acceleration_stage_training() {
+            let stage = AccelerationStage::for_training(0.1);
+            assert!(stage.is_training());
+            assert!(!stage.is_inference());
+            assert_eq!(stage.name(), "tritter-acceleration-training");
+        }
+
+        #[test]
+        fn acceleration_stage_inference() {
+            let stage = AccelerationStage::for_inference(32);
+            assert!(!stage.is_training());
+            assert!(stage.is_inference());
+            assert_eq!(stage.name(), "tritter-acceleration-inference");
+        }
+
+        #[test]
+        fn acceleration_stage_applies_training_metadata() {
+            let stage = AccelerationStage::for_training(0.1);
+            let backend = NullBackend::cpu();
+            let trace = InMemoryTraceSink::new();
+            let ctx = BuildContext {
+                backend: &backend,
+                trace: &trace,
+            };
+
+            let mut graph = BuildGraph::default();
+            graph.add_node("linear1", ModelConfig::new("linear", "1.0"));
+            graph.add_node("linear2", ModelConfig::new("linear", "1.0"));
+
+            let result = stage.execute(&ctx, &mut graph);
+            assert!(result.is_ok());
+
+            // Verify metadata was applied to all nodes
+            for node in &graph.nodes {
+                assert!(node.metadata.contains_key("accel.mode"));
+                assert_eq!(
+                    node.metadata.get("accel.mode"),
+                    Some(&serde_json::Value::String("training".to_string()))
+                );
+                assert!(node.metadata.contains_key("accel.compression_ratio"));
+                assert!(node.metadata.contains_key("accel.deterministic"));
+            }
+
+            // Verify trace event
+            let events = trace.events();
+            assert!(events
+                .iter()
+                .any(|e| e.message.contains("Applied training acceleration")));
+        }
+
+        #[test]
+        fn acceleration_stage_applies_inference_metadata() {
+            let config = InferenceAccelConfig::new(32).with_kv_cache(2048);
+            let stage = AccelerationStage::with_inference_config(config);
+
+            let backend = NullBackend::cpu();
+            let trace = InMemoryTraceSink::new();
+            let ctx = BuildContext {
+                backend: &backend,
+                trace: &trace,
+            };
+
+            let mut graph = BuildGraph::default();
+            graph.add_node("linear", ModelConfig::new("linear", "1.0"));
+
+            let result = stage.execute(&ctx, &mut graph);
+            assert!(result.is_ok());
+
+            // Verify metadata
+            let node = &graph.nodes[0];
+            assert_eq!(
+                node.metadata.get("accel.mode"),
+                Some(&serde_json::Value::String("inference".to_string()))
+            );
+            assert_eq!(
+                node.metadata.get("accel.batch_size"),
+                Some(&serde_json::Value::Number(serde_json::Number::from(32)))
+            );
+            assert_eq!(
+                node.metadata.get("accel.kv_cache"),
+                Some(&serde_json::Value::Bool(true))
+            );
+            assert_eq!(
+                node.metadata.get("accel.max_seq_len"),
+                Some(&serde_json::Value::Number(serde_json::Number::from(2048)))
+            );
+        }
+
+        #[test]
+        fn training_pipeline_with_acceleration() {
+            let pipeline = training_pipeline(0.1);
+
+            let backend = NullBackend::cpu();
+            let trace = InMemoryTraceSink::new();
+            let ctx = BuildContext {
+                backend: &backend,
+                trace: &trace,
+            };
+
+            let mut graph = BuildGraph::default();
+            graph.add_node("linear", ModelConfig::new("linear", "1.0"));
+
+            let result = pipeline.execute(&ctx, graph);
+            assert!(result.is_ok());
+
+            let events = trace.events();
+            // Should have validation, acceleration, and hashing events
+            assert!(events.iter().any(|e| e.message.contains("validated")));
+            assert!(events
+                .iter()
+                .any(|e| e.message.contains("Applied training acceleration")));
+            assert!(events.iter().any(|e| e.message.contains("computed graph hash")));
+        }
+
+        #[test]
+        fn inference_pipeline_with_acceleration() {
+            let pipeline = inference_pipeline(32);
+
+            let backend = NullBackend::cpu();
+            let trace = InMemoryTraceSink::new();
+            let ctx = BuildContext {
+                backend: &backend,
+                trace: &trace,
+            };
+
+            let mut graph = BuildGraph::default();
+            graph.add_node("linear", ModelConfig::new("linear", "1.0"));
+
+            let result = pipeline.execute(&ctx, graph);
+            assert!(result.is_ok());
+
+            let events = trace.events();
+            // Should have acceleration and hashing events (no validation for inference)
+            assert!(events
+                .iter()
+                .any(|e| e.message.contains("Applied inference acceleration")));
+            assert!(events.iter().any(|e| e.message.contains("computed graph hash")));
+        }
+
+        #[test]
+        fn gradient_compression_hooks_integration() {
+            let pre_hook = gradient_compression_pre_hook(0.1, 42);
+            let post_hook = gradient_compression_post_hook();
+
+            let backend = NullBackend::cpu();
+            let trace = InMemoryTraceSink::new();
+            let ctx = BuildContext {
+                backend: &backend,
+                trace: &trace,
+            };
+
+            // Run pre-hook
+            let result = pre_hook(&ctx);
+            assert!(result.is_ok());
+
+            // Apply acceleration to graph
+            let mut graph = BuildGraph::default();
+            graph.add_node("linear", ModelConfig::new("linear", "1.0"));
+
+            let stage = AccelerationStage::for_training(0.1);
+            stage.execute(&ctx, &mut graph).unwrap();
+
+            // Run post-hook
+            let trace2 = InMemoryTraceSink::new();
+            let ctx2 = BuildContext {
+                backend: &backend,
+                trace: &trace2,
+            };
+            let result = post_hook(&ctx2, &graph);
+            assert!(result.is_ok());
+
+            let events = trace2.events();
+            assert!(events.iter().any(|e| e.message.contains("validated")));
+        }
+
+        #[test]
+        fn tritter_backend_in_pipeline_context() {
+            let mut backend = TriterAccelBackend::cpu().with_training_mode(0.1);
+            backend.initialize().unwrap();
+
+            let trace = InMemoryTraceSink::new();
+            let ctx = BuildContext {
+                backend: &backend,
+                trace: &trace,
+            };
+
+            let stage = AccelerationStage::for_training(0.1);
+            let mut graph = BuildGraph::default();
+            graph.add_node("linear", ModelConfig::new("linear", "1.0"));
+
+            let result = stage.execute(&ctx, &mut graph);
+            assert!(result.is_ok());
+
+            // Verify backend is used in context
+            assert_eq!(ctx.backend.name(), "tritter-accel");
+        }
+
+        #[test]
+        fn tritter_backend_registry_integration() {
+            let mut registry = BackendRegistry::new();
+
+            let tritter_backend = Box::new(TriterAccelBackend::cpu().with_training_mode(0.1));
+            let null_backend = Box::new(NullBackend::cpu());
+
+            registry.register(tritter_backend);
+            registry.register(null_backend);
+
+            // Auto-detect should prefer tritter-accel over null
+            let auto_detected = registry.auto_detect();
+            assert!(auto_detected.is_some());
+            assert_eq!(auto_detected.unwrap().name(), "tritter-accel");
+
+            // Can explicitly get tritter-accel
+            let tritter = registry.get("tritter-accel");
+            assert!(tritter.is_some());
+            assert!(tritter.unwrap().is_available());
+        }
+
+        #[test]
+        fn training_config_builder_pattern() {
+            let config = TrainingConfig::new(0.1)
+                .with_deterministic(true)
+                .with_seed(42);
+
+            assert!((config.compression_ratio - 0.1).abs() < f32::EPSILON);
+            assert!(config.deterministic);
+            assert_eq!(config.seed, Some(42));
+        }
+
+        #[test]
+        fn inference_config_builder_pattern() {
+            let config = InferenceConfig::new(32)
+                .with_ternary_layers(true)
+                .with_kv_cache(2048);
+
+            assert_eq!(config.batch_size, 32);
+            assert!(config.use_ternary_layers);
+            assert!(config.use_kv_cache);
+            assert_eq!(config.max_seq_len, Some(2048));
+        }
+
+        #[test]
+        fn triter_device_variants() {
+            let cpu = TriterDevice::Cpu;
+            let cuda = TriterDevice::Cuda(0);
+            let metal = TriterDevice::Metal;
+
+            assert_eq!(cpu.as_str(), "cpu");
+            assert_eq!(cuda.as_str(), "cuda:0");
+            assert_eq!(metal.as_str(), "metal");
+        }
+
+        #[test]
+        fn acceleration_stage_with_full_training_config() {
+            let config = TrainingAccelConfig::new(0.05)
+                .with_seed(12345)
+                .with_mixed_precision();
+
+            let stage = AccelerationStage::with_training_config(config);
+            assert!(stage.is_training());
+
+            let backend = NullBackend::cpu();
+            let trace = InMemoryTraceSink::new();
+            let ctx = BuildContext {
+                backend: &backend,
+                trace: &trace,
+            };
+
+            let mut graph = BuildGraph::default();
+            graph.add_node("linear", ModelConfig::new("linear", "1.0"));
+
+            let result = stage.execute(&ctx, &mut graph);
+            assert!(result.is_ok());
+
+            // Verify full config was applied
+            let node = &graph.nodes[0];
+            assert!(node.metadata.contains_key("accel.seed"));
+            assert!(node.metadata.contains_key("accel.mixed_precision"));
+        }
+    }
+
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn async_pipeline_with_hooks() {
@@ -1059,5 +1406,984 @@ mod tests {
         assert_eq!(log[0], "pre_hook", "Pre-hook should execute first");
         assert_eq!(log[1], "async_stage", "Async stage should execute second");
         assert_eq!(log[2], "post_hook", "Post-hook should execute last");
+    }
+
+    // ============================================================================
+    // PROPERTY-BASED TESTS FOR GRAPH HASH STABILITY
+    // ============================================================================
+
+    /// Helper to generate test configs with different parameters
+    fn generate_test_configs(seed: u64) -> Vec<ModelConfig> {
+        let layers_options = [1, 2, 4, 8, 16, 32, 64];
+        let hidden_options = [64, 128, 256, 512, 1024];
+        let names = ["transformer", "attention", "feedforward", "embedding"];
+        let versions = ["1.0.0", "2.0.0", "3.0.0"];
+
+        // Use seed to select pseudo-random indices
+        let mut configs = Vec::new();
+        for i in 0..10 {
+            let idx = (seed.wrapping_mul(31).wrapping_add(i)) as usize;
+            let name = names[idx % names.len()];
+            let version = versions[idx % versions.len()];
+            let layers = layers_options[idx % layers_options.len()];
+            let hidden = hidden_options[idx % hidden_options.len()];
+
+            configs.push(
+                ModelConfig::new(name, version)
+                    .with_param("layers", serde_json::json!(layers))
+                    .with_param("hidden", serde_json::json!(hidden))
+                    .with_param("seed", serde_json::json!(seed + i)),
+            );
+        }
+        configs
+    }
+
+    #[test]
+    fn property_hash_deterministic_across_seeds() {
+        // Property: Same graph structure always produces same hash regardless of when computed
+        // Note: Using wrapping arithmetic in generate_test_configs, so avoid MAX values
+        for seed in [0u64, 42, 12345, 999999, 1_000_000_000] {
+            let configs = generate_test_configs(seed);
+
+            let mut graph1 = BuildGraph::default();
+            let mut graph2 = BuildGraph::default();
+
+            let mut nodes1 = Vec::new();
+            let mut nodes2 = Vec::new();
+
+            for (i, config) in configs.iter().enumerate() {
+                let n1 = graph1.add_node(&format!("node_{}", i), config.clone());
+                let n2 = graph2.add_node(&format!("node_{}", i), config.clone());
+                nodes1.push(n1);
+                nodes2.push(n2);
+
+                if i > 0 {
+                    graph1.add_edge(nodes1[i - 1], n1);
+                    graph2.add_edge(nodes2[i - 1], n2);
+                }
+            }
+
+            let hash1 = graph1.stable_hash();
+            let hash2 = graph2.stable_hash();
+
+            assert_eq!(
+                hash1, hash2,
+                "Identical graphs with seed {} should produce same hash",
+                seed
+            );
+
+            // Verify hash doesn't change on re-computation
+            let hash1_again = graph1.stable_hash();
+            assert_eq!(hash1, hash1_again, "Hash should be stable across calls");
+        }
+    }
+
+    #[test]
+    fn property_different_params_produce_different_hashes() {
+        // Property: Different configurations should produce different hashes
+        let mut hashes = std::collections::HashSet::new();
+
+        for layers in [1, 2, 4, 8, 16] {
+            for hidden in [64, 128, 256, 512] {
+                let config = ModelConfig::new("test-model", "1.0.0")
+                    .with_param("layers", serde_json::json!(layers))
+                    .with_param("hidden", serde_json::json!(hidden));
+
+                let mut graph = BuildGraph::default();
+                let n = graph.add_node("node", config);
+                graph.add_edge(n, n);
+
+                let hash = graph.stable_hash();
+                hashes.insert(hash);
+            }
+        }
+
+        // All 20 combinations (5 layers * 4 hidden) should produce unique hashes
+        assert_eq!(
+            hashes.len(),
+            20,
+            "All different configs should produce unique hashes"
+        );
+    }
+
+    #[test]
+    fn property_node_order_matters_for_hash() {
+        // Property: Node order affects hash (graphs are ordered)
+        let config_a = ModelConfig::new("model-a", "1.0.0");
+        let config_b = ModelConfig::new("model-b", "1.0.0");
+
+        let mut graph1 = BuildGraph::default();
+        let n1a = graph1.add_node("first", config_a.clone());
+        let n1b = graph1.add_node("second", config_b.clone());
+        graph1.add_edge(n1a, n1b);
+
+        let mut graph2 = BuildGraph::default();
+        let n2b = graph2.add_node("first", config_b.clone());
+        let n2a = graph2.add_node("second", config_a.clone());
+        graph2.add_edge(n2b, n2a);
+
+        let hash1 = graph1.stable_hash();
+        let hash2 = graph2.stable_hash();
+
+        assert_ne!(
+            hash1, hash2,
+            "Graphs with different node orders should have different hashes"
+        );
+    }
+
+    #[test]
+    fn property_edge_structure_affects_hash() {
+        // Property: Different edge structures produce different hashes
+        let config = ModelConfig::new("node", "1.0.0");
+
+        // Linear chain: A -> B -> C
+        let mut graph_linear = BuildGraph::default();
+        let la = graph_linear.add_node("a", config.clone());
+        let lb = graph_linear.add_node("b", config.clone());
+        let lc = graph_linear.add_node("c", config.clone());
+        graph_linear.add_edge(la, lb);
+        graph_linear.add_edge(lb, lc);
+
+        // Branching: A -> B, A -> C
+        let mut graph_branch = BuildGraph::default();
+        let ba = graph_branch.add_node("a", config.clone());
+        let bb = graph_branch.add_node("b", config.clone());
+        let bc = graph_branch.add_node("c", config.clone());
+        graph_branch.add_edge(ba, bb);
+        graph_branch.add_edge(ba, bc);
+
+        assert_ne!(
+            graph_linear.stable_hash(),
+            graph_branch.stable_hash(),
+            "Different edge structures should have different hashes"
+        );
+    }
+
+    #[test]
+    fn property_hash_length_consistent() {
+        // Property: Hash length is always 64 hex characters (SHA256)
+        for i in 0..100 {
+            let config = ModelConfig::new(&format!("model-{}", i), "1.0.0")
+                .with_param("iteration", serde_json::json!(i));
+
+            let mut graph = BuildGraph::default();
+            let n = graph.add_node("node", config);
+            graph.add_edge(n, n);
+
+            let hash = graph.stable_hash();
+            assert_eq!(
+                hash.len(),
+                64,
+                "Hash should always be 64 hex characters, got {} for iteration {}",
+                hash.len(),
+                i
+            );
+            assert!(
+                hash.chars().all(|c| c.is_ascii_hexdigit()),
+                "Hash should only contain hex digits"
+            );
+        }
+    }
+
+    // ============================================================================
+    // CONCURRENT TRACE SINK STRESS TESTS
+    // ============================================================================
+
+    #[test]
+    fn concurrent_trace_sink_multiple_writers() {
+        use std::thread;
+
+        let sink = Arc::new(InMemoryTraceSink::new());
+        let num_threads = 10;
+        let events_per_thread = 100;
+
+        let handles: Vec<_> = (0..num_threads)
+            .map(|thread_id| {
+                let sink_clone = Arc::clone(&sink);
+                thread::spawn(move || {
+                    for event_id in 0..events_per_thread {
+                        let event = TraceEvent {
+                            id: format!("thread-{}-event-{}", thread_id, event_id),
+                            message: format!("Message from thread {} event {}", thread_id, event_id),
+                            timestamp: SystemTime::now(),
+                            level: TraceLevel::Info,
+                            span_id: Some(format!("span-{}", thread_id)),
+                            trace_id: Some(format!("trace-{}", thread_id)),
+                        };
+                        sink_clone.record(event);
+                    }
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().expect("Thread panicked");
+        }
+
+        let events = sink.events();
+        assert_eq!(
+            events.len(),
+            num_threads * events_per_thread,
+            "All events from all threads should be recorded"
+        );
+    }
+
+    #[test]
+    fn concurrent_trace_sink_mixed_levels() {
+        use std::thread;
+
+        let sink = Arc::new(InMemoryTraceSink::new());
+        let num_threads = 5;
+
+        let handles: Vec<_> = (0..num_threads)
+            .map(|thread_id| {
+                let sink_clone = Arc::clone(&sink);
+                thread::spawn(move || {
+                    // Each thread writes events with different levels
+                    let levels = [
+                        TraceLevel::Debug,
+                        TraceLevel::Info,
+                        TraceLevel::Warn,
+                        TraceLevel::Error,
+                    ];
+                    for (i, level) in levels.iter().enumerate() {
+                        let event = TraceEvent {
+                            id: format!("t{}-l{}", thread_id, i),
+                            message: format!("Level {:?} from thread {}", level, thread_id),
+                            timestamp: SystemTime::now(),
+                            level: level.clone(),
+                            span_id: None,
+                            trace_id: None,
+                        };
+                        sink_clone.record(event);
+                    }
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().expect("Thread panicked");
+        }
+
+        let events = sink.events();
+        assert_eq!(events.len(), num_threads * 4);
+
+        // Count events by level
+        let debug_count = events.iter().filter(|e| matches!(e.level, TraceLevel::Debug)).count();
+        let info_count = events.iter().filter(|e| matches!(e.level, TraceLevel::Info)).count();
+        let warn_count = events.iter().filter(|e| matches!(e.level, TraceLevel::Warn)).count();
+        let error_count = events.iter().filter(|e| matches!(e.level, TraceLevel::Error)).count();
+
+        assert_eq!(debug_count, num_threads);
+        assert_eq!(info_count, num_threads);
+        assert_eq!(warn_count, num_threads);
+        assert_eq!(error_count, num_threads);
+    }
+
+    #[test]
+    fn concurrent_multi_sink_stress() {
+        use std::thread;
+
+        let sink1 = Arc::new(InMemoryTraceSink::new());
+        let sink2 = Arc::new(InMemoryTraceSink::new());
+        let exporter = Arc::new(JsonExporter::new());
+
+        let multi_sink = Arc::new(MultiSink::new(vec![
+            Arc::clone(&sink1) as Arc<dyn TraceSink>,
+            Arc::clone(&sink2) as Arc<dyn TraceSink>,
+            Arc::clone(&exporter) as Arc<dyn TraceSink>,
+        ]));
+
+        let num_threads = 8;
+        let events_per_thread = 50;
+
+        let handles: Vec<_> = (0..num_threads)
+            .map(|thread_id| {
+                let multi_sink_clone = Arc::clone(&multi_sink);
+                thread::spawn(move || {
+                    for event_id in 0..events_per_thread {
+                        let event = TraceEvent {
+                            id: format!("multi-{}-{}", thread_id, event_id),
+                            message: format!("Multi-sink message {} from {}", event_id, thread_id),
+                            timestamp: SystemTime::now(),
+                            level: TraceLevel::Info,
+                            span_id: None,
+                            trace_id: None,
+                        };
+                        multi_sink_clone.record(event);
+                    }
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().expect("Thread panicked");
+        }
+
+        let expected_total = num_threads * events_per_thread;
+
+        // All sinks should have received all events
+        assert_eq!(sink1.events().len(), expected_total);
+        assert_eq!(sink2.events().len(), expected_total);
+
+        let json = exporter.to_json();
+        assert!(!json.is_empty());
+        // Verify JSON contains events from multiple threads
+        assert!(json.contains("multi-0-"));
+        assert!(json.contains("multi-1-"));
+    }
+
+    #[test]
+    fn concurrent_json_exporter_serialization_safety() {
+        use std::thread;
+
+        let exporter = Arc::new(JsonExporter::new());
+        let num_threads = 4;
+        let events_per_thread = 25;
+
+        let handles: Vec<_> = (0..num_threads)
+            .map(|thread_id| {
+                let exporter_clone = Arc::clone(&exporter);
+                thread::spawn(move || {
+                    for event_id in 0..events_per_thread {
+                        let event = TraceEvent {
+                            id: format!("json-{}-{}", thread_id, event_id),
+                            message: format!("JSON test from thread {}", thread_id),
+                            timestamp: SystemTime::now(),
+                            level: TraceLevel::Debug,
+                            span_id: Some(format!("span-{}", thread_id)),
+                            trace_id: Some(format!("trace-{}", thread_id)),
+                        };
+                        exporter_clone.record(event);
+                    }
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().expect("Thread panicked");
+        }
+
+        // Verify JSON is valid and contains all events
+        let json = exporter.to_json();
+        assert!(json.starts_with("["));
+        assert!(json.ends_with("]"));
+
+        // Count occurrences - all threads should be represented
+        for thread_id in 0..num_threads {
+            assert!(
+                json.contains(&format!("json-{}-", thread_id)),
+                "Events from thread {} should be in JSON",
+                thread_id
+            );
+        }
+    }
+
+    // ============================================================================
+    // PIPELINE ERROR RECOVERY TESTS
+    // ============================================================================
+
+    /// A stage that can be configured to fail on specific conditions
+    struct ConditionalFailureStage {
+        name: String,
+        fail_on_node_count: Option<usize>,
+        fail_message: String,
+        execution_count: Arc<Mutex<usize>>,
+    }
+
+    impl ConditionalFailureStage {
+        fn new(name: &str) -> Self {
+            Self {
+                name: name.to_string(),
+                fail_on_node_count: None,
+                fail_message: "Conditional failure".to_string(),
+                execution_count: Arc::new(Mutex::new(0)),
+            }
+        }
+
+        fn fail_when_nodes_equal(mut self, count: usize) -> Self {
+            self.fail_on_node_count = Some(count);
+            self
+        }
+
+        fn with_message(mut self, msg: &str) -> Self {
+            self.fail_message = msg.to_string();
+            self
+        }
+
+        fn with_counter(mut self, counter: Arc<Mutex<usize>>) -> Self {
+            self.execution_count = counter;
+            self
+        }
+    }
+
+    impl PipelineStage for ConditionalFailureStage {
+        fn name(&self) -> &str {
+            &self.name
+        }
+
+        fn execute(
+            &self,
+            _ctx: &BuildContext,
+            graph: &mut BuildGraph,
+        ) -> aphelion_core::error::AphelionResult<()> {
+            let mut count = self.execution_count.lock().unwrap();
+            *count += 1;
+
+            if let Some(fail_count) = self.fail_on_node_count {
+                if graph.node_count() == fail_count {
+                    return Err(aphelion_core::error::AphelionError::build(
+                        &self.fail_message,
+                    ));
+                }
+            }
+
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn pipeline_recovery_failure_at_first_stage() {
+        let counter = Arc::new(Mutex::new(0));
+
+        let stage1 = Box::new(
+            ConditionalFailureStage::new("stage1")
+                .fail_when_nodes_equal(0)
+                .with_message("No nodes in graph")
+                .with_counter(Arc::clone(&counter)),
+        );
+        let stage2 = Box::new(
+            ConditionalFailureStage::new("stage2").with_counter(Arc::clone(&counter)),
+        );
+
+        let pipeline = BuildPipeline::new().with_stage(stage1).with_stage(stage2);
+
+        let backend = NullBackend::cpu();
+        let trace = InMemoryTraceSink::new();
+        let ctx = BuildContext {
+            backend: &backend,
+            trace: &trace,
+        };
+
+        // Empty graph should trigger failure at stage1
+        let graph = BuildGraph::default();
+        let result = pipeline.execute(&ctx, graph);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            format!("{:?}", err).contains("No nodes in graph"),
+            "Error should contain failure message"
+        );
+
+        // Only first stage should have executed
+        assert_eq!(*counter.lock().unwrap(), 1);
+    }
+
+    #[test]
+    fn pipeline_recovery_failure_at_middle_stage() {
+        let counter = Arc::new(Mutex::new(0));
+
+        let stage1 = Box::new(
+            ConditionalFailureStage::new("stage1").with_counter(Arc::clone(&counter)),
+        );
+        let stage2 = Box::new(
+            ConditionalFailureStage::new("stage2")
+                .fail_when_nodes_equal(1)
+                .with_message("Single node not allowed")
+                .with_counter(Arc::clone(&counter)),
+        );
+        let stage3 = Box::new(
+            ConditionalFailureStage::new("stage3").with_counter(Arc::clone(&counter)),
+        );
+
+        let pipeline = BuildPipeline::new()
+            .with_stage(stage1)
+            .with_stage(stage2)
+            .with_stage(stage3);
+
+        let backend = NullBackend::cpu();
+        let trace = InMemoryTraceSink::new();
+        let ctx = BuildContext {
+            backend: &backend,
+            trace: &trace,
+        };
+
+        // Graph with one node should fail at stage2
+        let mut graph = BuildGraph::default();
+        graph.add_node("single", ModelConfig::new("test", "1.0.0"));
+
+        let result = pipeline.execute(&ctx, graph);
+
+        assert!(result.is_err());
+        // First two stages should have executed
+        assert_eq!(*counter.lock().unwrap(), 2);
+    }
+
+    #[test]
+    fn pipeline_recovery_success_path_after_fix() {
+        let counter = Arc::new(Mutex::new(0));
+
+        let stage1 = Box::new(
+            ConditionalFailureStage::new("stage1")
+                .fail_when_nodes_equal(0)
+                .with_counter(Arc::clone(&counter)),
+        );
+        let stage2 = Box::new(
+            ConditionalFailureStage::new("stage2").with_counter(Arc::clone(&counter)),
+        );
+
+        let pipeline = BuildPipeline::new().with_stage(stage1).with_stage(stage2);
+
+        let backend = NullBackend::cpu();
+        let trace = InMemoryTraceSink::new();
+        let ctx = BuildContext {
+            backend: &backend,
+            trace: &trace,
+        };
+
+        // First attempt with empty graph - should fail
+        let empty_graph = BuildGraph::default();
+        let result1 = pipeline.execute(&ctx, empty_graph);
+        assert!(result1.is_err());
+
+        // Reset counter and try again with non-empty graph
+        *counter.lock().unwrap() = 0;
+
+        let mut fixed_graph = BuildGraph::default();
+        fixed_graph.add_node("node", ModelConfig::new("test", "1.0.0"));
+
+        let result2 = pipeline.execute(&ctx, fixed_graph);
+        assert!(result2.is_ok(), "Pipeline should succeed with fixed graph");
+        assert_eq!(*counter.lock().unwrap(), 2, "Both stages should execute");
+    }
+
+    #[test]
+    fn pipeline_pre_hook_failure_prevents_stage_execution() {
+        let stage_counter = Arc::new(Mutex::new(0));
+        let hook_counter = Arc::new(Mutex::new(0));
+
+        let hook_counter_clone = Arc::clone(&hook_counter);
+        let failing_pre_hook = move |_ctx: &BuildContext| -> aphelion_core::error::AphelionResult<()> {
+            *hook_counter_clone.lock().unwrap() += 1;
+            Err(aphelion_core::error::AphelionError::build(
+                "Pre-hook validation failed",
+            ))
+        };
+
+        let stage = Box::new(CountingStage::new("stage", Arc::clone(&stage_counter)));
+
+        let pipeline = BuildPipeline::new()
+            .with_pre_hook(failing_pre_hook)
+            .with_stage(stage);
+
+        let backend = NullBackend::cpu();
+        let trace = InMemoryTraceSink::new();
+        let ctx = BuildContext {
+            backend: &backend,
+            trace: &trace,
+        };
+
+        let graph = BuildGraph::default();
+        let result = pipeline.execute(&ctx, graph);
+
+        assert!(result.is_err());
+        assert_eq!(*hook_counter.lock().unwrap(), 1, "Pre-hook should have run");
+        assert_eq!(
+            *stage_counter.lock().unwrap(),
+            0,
+            "Stage should not run after pre-hook failure"
+        );
+    }
+
+    #[test]
+    fn pipeline_post_hook_failure_after_successful_stages() {
+        let stage_counter = Arc::new(Mutex::new(0));
+
+        let failing_post_hook =
+            move |_ctx: &BuildContext, _graph: &BuildGraph| -> aphelion_core::error::AphelionResult<()> {
+                Err(aphelion_core::error::AphelionError::build(
+                    "Post-hook cleanup failed",
+                ))
+            };
+
+        let stage = Box::new(CountingStage::new("stage", Arc::clone(&stage_counter)));
+
+        let pipeline = BuildPipeline::new()
+            .with_stage(stage)
+            .with_post_hook(failing_post_hook);
+
+        let backend = NullBackend::cpu();
+        let trace = InMemoryTraceSink::new();
+        let ctx = BuildContext {
+            backend: &backend,
+            trace: &trace,
+        };
+
+        let graph = BuildGraph::default();
+        let result = pipeline.execute(&ctx, graph);
+
+        assert!(result.is_err());
+        assert_eq!(
+            *stage_counter.lock().unwrap(),
+            1,
+            "Stage should have run before post-hook failure"
+        );
+    }
+
+    #[test]
+    fn pipeline_error_contains_stage_context() {
+        struct NamedFailingStage {
+            name: String,
+        }
+
+        impl PipelineStage for NamedFailingStage {
+            fn name(&self) -> &str {
+                &self.name
+            }
+
+            fn execute(
+                &self,
+                _ctx: &BuildContext,
+                _graph: &mut BuildGraph,
+            ) -> aphelion_core::error::AphelionResult<()> {
+                Err(aphelion_core::error::AphelionError::build(&format!(
+                    "Stage '{}' failed: resource exhausted",
+                    self.name
+                )))
+            }
+        }
+
+        let pipeline = BuildPipeline::new().with_stage(Box::new(NamedFailingStage {
+            name: "optimization_pass".to_string(),
+        }));
+
+        let backend = NullBackend::cpu();
+        let trace = InMemoryTraceSink::new();
+        let ctx = BuildContext {
+            backend: &backend,
+            trace: &trace,
+        };
+
+        let graph = BuildGraph::default();
+        let result = pipeline.execute(&ctx, graph);
+
+        assert!(result.is_err());
+        let err_string = format!("{:?}", result.unwrap_err());
+        assert!(err_string.contains("optimization_pass"));
+        assert!(err_string.contains("resource exhausted"));
+    }
+
+    // ============================================================================
+    // BURN BACKEND TESTS (feature-gated)
+    // ============================================================================
+
+    #[cfg(feature = "burn")]
+    mod burn_backend_tests {
+        use super::*;
+        use aphelion_core::burn_backend::{BurnBackend, BurnBackendConfig, BurnDevice};
+
+        #[test]
+        fn burn_device_label_formatting() {
+            assert_eq!(BurnDevice::Cpu.as_label(), "cpu");
+            assert_eq!(BurnDevice::Cuda(0).as_label(), "cuda:0");
+            assert_eq!(BurnDevice::Cuda(1).as_label(), "cuda:1");
+            assert_eq!(BurnDevice::Metal(0).as_label(), "metal:0");
+            assert_eq!(BurnDevice::Vulkan(0).as_label(), "vulkan:0");
+        }
+
+        #[test]
+        fn burn_device_type_checks() {
+            assert!(BurnDevice::Cpu.is_cpu());
+            assert!(!BurnDevice::Cpu.is_gpu());
+
+            assert!(!BurnDevice::Cuda(0).is_cpu());
+            assert!(BurnDevice::Cuda(0).is_gpu());
+
+            assert!(!BurnDevice::Metal(0).is_cpu());
+            assert!(BurnDevice::Metal(0).is_gpu());
+
+            assert!(!BurnDevice::Vulkan(0).is_cpu());
+            assert!(BurnDevice::Vulkan(0).is_gpu());
+        }
+
+        #[test]
+        fn burn_backend_default_config() {
+            let config = BurnBackendConfig::default();
+            assert!(config.device.is_cpu());
+            assert!(!config.allow_tf32);
+        }
+
+        #[test]
+        fn burn_backend_cpu_creation() {
+            let config = BurnBackendConfig {
+                device: BurnDevice::Cpu,
+                allow_tf32: false,
+            };
+            let backend = BurnBackend::new(config);
+
+            assert_eq!(backend.name(), "burn");
+            assert_eq!(backend.device(), "cpu");
+        }
+
+        #[test]
+        fn burn_backend_lifecycle() {
+            let config = BurnBackendConfig::default();
+            let mut backend = BurnBackend::new(config);
+
+            // CPU should always be available
+            assert!(backend.is_available());
+
+            // Initialize and shutdown
+            let init_result = backend.initialize();
+            assert!(init_result.is_ok());
+
+            let shutdown_result = backend.shutdown();
+            assert!(shutdown_result.is_ok());
+        }
+
+        #[test]
+        fn burn_backend_capabilities() {
+            let config = BurnBackendConfig {
+                device: BurnDevice::Cpu,
+                allow_tf32: true,
+            };
+            let backend = BurnBackend::new(config);
+            let caps = backend.capabilities();
+
+            // CPU backend has limited capabilities
+            assert!(!caps.supports_tf32); // TF32 is GPU-only
+        }
+
+        #[test]
+        fn burn_backend_in_build_context() {
+            let config = BurnBackendConfig::default();
+            let mut backend = BurnBackend::new(config);
+            backend.initialize().unwrap();
+
+            let trace = InMemoryTraceSink::new();
+            let ctx = BuildContext {
+                backend: &backend,
+                trace: &trace,
+            };
+
+            // Verify backend is usable in pipeline context
+            assert_eq!(ctx.backend.name(), "burn");
+            assert!(ctx.backend.is_available());
+        }
+
+        #[test]
+        fn burn_backend_registry_integration() {
+            let mut registry = BackendRegistry::new();
+
+            let burn_backend = Box::new(BurnBackend::new(BurnBackendConfig::default()));
+            let null_backend = Box::new(NullBackend::cpu());
+
+            registry.register(burn_backend);
+            registry.register(null_backend);
+
+            // Should be able to retrieve burn backend
+            let burn = registry.get("burn");
+            assert!(burn.is_some());
+            assert_eq!(burn.unwrap().name(), "burn");
+        }
+
+        #[test]
+        fn burn_backend_with_pipeline() {
+            let config = BurnBackendConfig::default();
+            let mut backend = BurnBackend::new(config);
+            backend.initialize().unwrap();
+
+            let trace = InMemoryTraceSink::new();
+            let ctx = BuildContext {
+                backend: &backend,
+                trace: &trace,
+            };
+
+            let counter = Arc::new(Mutex::new(0));
+            let stage = Box::new(CountingStage::new("burn_test_stage", Arc::clone(&counter)));
+
+            let pipeline = BuildPipeline::new().with_stage(stage);
+
+            let mut graph = BuildGraph::default();
+            graph.add_node("test", ModelConfig::new("burn-model", "1.0.0"));
+
+            let result = pipeline.execute(&ctx, graph);
+            assert!(result.is_ok());
+            assert_eq!(*counter.lock().unwrap(), 1);
+
+            backend.shutdown().unwrap();
+        }
+    }
+
+    // ============================================================================
+    // CUBECL BACKEND TESTS (feature-gated)
+    // ============================================================================
+
+    #[cfg(feature = "cubecl")]
+    mod cubecl_backend_tests {
+        use super::*;
+        use aphelion_core::cubecl_backend::{CubeclBackend, CubeclBackendConfig, CubeclDevice};
+
+        #[test]
+        fn cubecl_device_label_formatting() {
+            assert_eq!(CubeclDevice::Cpu.as_label(), "cpu");
+            assert_eq!(CubeclDevice::Cuda(0).as_label(), "cuda:0");
+            assert_eq!(CubeclDevice::Cuda(2).as_label(), "cuda:2");
+            assert_eq!(CubeclDevice::Metal(0).as_label(), "metal:0");
+            assert_eq!(CubeclDevice::Vulkan(0).as_label(), "vulkan:0");
+            assert_eq!(CubeclDevice::Wgpu(0).as_label(), "wgpu:0");
+        }
+
+        #[test]
+        fn cubecl_device_type_checks() {
+            assert!(CubeclDevice::Cpu.is_cpu());
+            assert!(!CubeclDevice::Cpu.is_gpu());
+
+            assert!(!CubeclDevice::Cuda(0).is_cpu());
+            assert!(CubeclDevice::Cuda(0).is_gpu());
+
+            assert!(!CubeclDevice::Metal(0).is_cpu());
+            assert!(CubeclDevice::Metal(0).is_gpu());
+
+            assert!(!CubeclDevice::Vulkan(0).is_cpu());
+            assert!(CubeclDevice::Vulkan(0).is_gpu());
+
+            assert!(!CubeclDevice::Wgpu(0).is_cpu());
+            assert!(CubeclDevice::Wgpu(0).is_gpu());
+        }
+
+        #[test]
+        fn cubecl_backend_default_config() {
+            let config = CubeclBackendConfig::default();
+            assert!(config.device.is_cpu());
+            assert!((config.memory_fraction - 0.9).abs() < f32::EPSILON);
+        }
+
+        #[test]
+        fn cubecl_backend_cpu_creation() {
+            let config = CubeclBackendConfig {
+                device: CubeclDevice::Cpu,
+                memory_fraction: 0.8,
+            };
+            let backend = CubeclBackend::new(config);
+
+            assert_eq!(backend.name(), "cubecl");
+            assert_eq!(backend.device(), "cpu");
+        }
+
+        #[test]
+        fn cubecl_backend_lifecycle() {
+            let config = CubeclBackendConfig::default();
+            let mut backend = CubeclBackend::new(config);
+
+            // CPU should always be available
+            assert!(backend.is_available());
+
+            // Initialize and shutdown
+            let init_result = backend.initialize();
+            assert!(init_result.is_ok());
+
+            let shutdown_result = backend.shutdown();
+            assert!(shutdown_result.is_ok());
+        }
+
+        #[test]
+        fn cubecl_backend_capabilities() {
+            let config = CubeclBackendConfig::default();
+            let backend = CubeclBackend::new(config);
+            let caps = backend.capabilities();
+
+            // CPU backend should report no GPU-specific features
+            assert!(!caps.supports_tf32);
+        }
+
+        #[test]
+        fn cubecl_backend_in_build_context() {
+            let config = CubeclBackendConfig::default();
+            let mut backend = CubeclBackend::new(config);
+            backend.initialize().unwrap();
+
+            let trace = InMemoryTraceSink::new();
+            let ctx = BuildContext {
+                backend: &backend,
+                trace: &trace,
+            };
+
+            // Verify backend is usable in pipeline context
+            assert_eq!(ctx.backend.name(), "cubecl");
+            assert!(ctx.backend.is_available());
+        }
+
+        #[test]
+        fn cubecl_backend_registry_integration() {
+            let mut registry = BackendRegistry::new();
+
+            let cubecl_backend = Box::new(CubeclBackend::new(CubeclBackendConfig::default()));
+            let null_backend = Box::new(NullBackend::cpu());
+
+            registry.register(cubecl_backend);
+            registry.register(null_backend);
+
+            // Should be able to retrieve cubecl backend
+            let cubecl = registry.get("cubecl");
+            assert!(cubecl.is_some());
+            assert_eq!(cubecl.unwrap().name(), "cubecl");
+        }
+
+        #[test]
+        fn cubecl_backend_with_pipeline() {
+            let config = CubeclBackendConfig::default();
+            let mut backend = CubeclBackend::new(config);
+            backend.initialize().unwrap();
+
+            let trace = InMemoryTraceSink::new();
+            let ctx = BuildContext {
+                backend: &backend,
+                trace: &trace,
+            };
+
+            let counter = Arc::new(Mutex::new(0));
+            let stage = Box::new(CountingStage::new("cubecl_test_stage", Arc::clone(&counter)));
+
+            let pipeline = BuildPipeline::new().with_stage(stage);
+
+            let mut graph = BuildGraph::default();
+            graph.add_node("test", ModelConfig::new("cubecl-model", "1.0.0"));
+
+            let result = pipeline.execute(&ctx, graph);
+            assert!(result.is_ok());
+            assert_eq!(*counter.lock().unwrap(), 1);
+
+            backend.shutdown().unwrap();
+        }
+
+        #[test]
+        fn cubecl_backend_memory_fraction_config() {
+            let config = CubeclBackendConfig {
+                device: CubeclDevice::Cuda(0),
+                memory_fraction: 0.5,
+            };
+            let backend = CubeclBackend::new(config);
+
+            // Verify configuration is stored (implementation detail)
+            assert_eq!(backend.name(), "cubecl");
+            // Note: device() returns just the device type, not the index
+            assert_eq!(backend.device(), "cuda");
+        }
+
+        #[test]
+        fn cubecl_wgpu_device_creation() {
+            // WebGPU device - useful for cross-platform support
+            let config = CubeclBackendConfig {
+                device: CubeclDevice::Wgpu(0),
+                memory_fraction: 0.9,
+            };
+            let backend = CubeclBackend::new(config);
+
+            assert_eq!(backend.name(), "cubecl");
+            // Note: device() returns just the device type, not the index
+            assert_eq!(backend.device(), "wgpu");
+        }
     }
 }

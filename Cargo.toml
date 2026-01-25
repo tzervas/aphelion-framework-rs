@@ -5,10 +5,11 @@ members = [
     "crates/aphelion-macros",
     "crates/aphelion-examples",
     "crates/aphelion-tests",
+    "crates/aphelion-python",
 ]
 
 [workspace.package]
-version = "1.1.0"
+version = "1.0.0"
 edition = "2021"
 license = "MIT"
 authors = ["Tyler Zervas <tz-dev@vectorweight.com>"]
