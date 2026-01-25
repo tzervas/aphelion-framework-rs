@@ -201,10 +201,7 @@ pub fn run_example() -> AphelionResult<()> {
             );
         });
 
-    let ctx = BuildContext {
-        backend: &backend,
-        trace: &trace_sink,
-    };
+    let ctx = BuildContext::new(&backend, &trace_sink);
 
     println!();
     pipeline.execute(&ctx, graph)?;
@@ -224,10 +221,7 @@ pub fn run_example() -> AphelionResult<()> {
     graph.add_node("main", config);
 
     let trace_sink = InMemoryTraceSink::new();
-    let ctx = BuildContext {
-        backend: &backend,
-        trace: &trace_sink,
-    };
+    let ctx = BuildContext::new(&backend, &trace_sink);
 
     let pipeline = BuildPipeline::new()
         .with_stage(Box::new(ValidateStructureStage))

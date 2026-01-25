@@ -2,9 +2,13 @@
 
 use pyo3::prelude::*;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use aphelion_core::backend::NullBackend;
 use aphelion_core::diagnostics::{InMemoryTraceSink, TraceEvent, TraceLevel};
+use aphelion_core::error::AphelionError;
+use aphelion_core::graph::BuildGraph;
+use aphelion_core::pipeline::{BuildContext, HashingStage, PipelineStage, ValidationStage};
 
 use crate::backend::{AnyBackend, PyNullBackend};
 use crate::diagnostics::{AnyTraceSink, PyInMemoryTraceSink};
@@ -47,6 +51,30 @@ pub struct PyBuildPipeline {
     stages: Vec<String>,
 }
 
+/// Execute a named stage on the graph.
+fn execute_stage(
+    stage_name: &str,
+    ctx: &BuildContext<'_>,
+    graph: &mut BuildGraph,
+) -> Result<(), AphelionError> {
+    match stage_name {
+        "validation" => ValidationStage.execute(ctx, graph),
+        "hashing" => HashingStage.execute(ctx, graph),
+        _ => {
+            // Unknown stages are logged but don't fail the pipeline
+            ctx.trace.record(TraceEvent {
+                id: format!("stage.{}", stage_name),
+                message: format!("Unknown stage '{}' skipped", stage_name),
+                timestamp: SystemTime::now(),
+                level: TraceLevel::Warn,
+                span_id: None,
+                trace_id: None,
+            });
+            Ok(())
+        }
+    }
+}
+
 #[pymethods]
 impl PyBuildPipeline {
     #[new]
@@ -70,8 +98,9 @@ impl PyBuildPipeline {
 
     #[staticmethod]
     fn for_inference() -> Self {
+        // Inference pipeline skips validation for speed
         Self {
-            stages: vec!["validation".to_string(), "hashing".to_string()],
+            stages: vec!["hashing".to_string()],
         }
     }
 
@@ -83,37 +112,123 @@ impl PyBuildPipeline {
 
     /// Execute the pipeline synchronously.
     fn execute(&self, ctx: &PyBuildContext, graph: PyBuildGraph) -> PyResult<PyBuildGraph> {
+        let trace_sink = ctx.trace.as_trace_sink();
+
         // Record execution start
-        let trace_event = TraceEvent {
-            id: "pipeline.execute".to_string(),
+        trace_sink.record(TraceEvent {
+            id: "pipeline.start".to_string(),
             message: format!("Executing pipeline with {} stages", self.stages.len()),
-            timestamp: std::time::SystemTime::now(),
+            timestamp: SystemTime::now(),
             level: TraceLevel::Info,
             span_id: None,
             trace_id: None,
-        };
-        ctx.trace.as_trace_sink().record(trace_event);
+        });
 
-        // For now, just return the graph as-is (placeholder)
-        // Real implementation would execute each stage
-        Ok(graph)
+        // Create Rust build context
+        let rust_ctx = BuildContext::new(ctx.backend.as_backend(), trace_sink);
+
+        // Execute each stage
+        let mut rust_graph = graph.inner;
+        let total_stages = self.stages.len();
+
+        for (index, stage_name) in self.stages.iter().enumerate() {
+            // Record stage start
+            trace_sink.record(TraceEvent {
+                id: format!("stage.{}.start", stage_name),
+                message: format!(
+                    "Starting stage '{}' ({}/{})",
+                    stage_name,
+                    index + 1,
+                    total_stages
+                ),
+                timestamp: SystemTime::now(),
+                level: TraceLevel::Debug,
+                span_id: None,
+                trace_id: None,
+            });
+
+            // Execute the stage
+            execute_stage(stage_name, &rust_ctx, &mut rust_graph).map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Stage '{}' failed: {}",
+                    stage_name, e
+                ))
+            })?;
+        }
+
+        // Record execution completion
+        trace_sink.record(TraceEvent {
+            id: "pipeline.complete".to_string(),
+            message: format!(
+                "Pipeline completed successfully ({} stages)",
+                self.stages.len()
+            ),
+            timestamp: SystemTime::now(),
+            level: TraceLevel::Info,
+            span_id: None,
+            trace_id: None,
+        });
+
+        Ok(PyBuildGraph { inner: rust_graph })
     }
 
     /// Execute the pipeline asynchronously.
     fn execute_async<'py>(
         &self,
         py: Python<'py>,
-        _ctx: &PyBuildContext,
+        ctx: &PyBuildContext,
         graph: PyBuildGraph,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let _stages = self.stages.clone();
-        let rust_graph = graph.inner;
+        let stages = self.stages.clone();
+        let mut rust_graph = graph.inner;
+        let backend = ctx.backend.clone();
+        let trace = ctx.trace.clone();
 
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            // Simulate async execution
+            // Yield to allow other tasks to run
             tokio::task::yield_now().await;
 
-            // Return processed graph
+            let trace_sink = trace.as_trace_sink();
+
+            // Record execution start
+            trace_sink.record(TraceEvent {
+                id: "pipeline.async.start".to_string(),
+                message: format!("Executing async pipeline with {} stages", stages.len()),
+                timestamp: SystemTime::now(),
+                level: TraceLevel::Info,
+                span_id: None,
+                trace_id: None,
+            });
+
+            // Create Rust build context
+            let rust_ctx = BuildContext::new(backend.as_backend(), trace_sink);
+
+            // Execute each stage
+            for stage_name in &stages {
+                // Yield between stages for better async behavior
+                tokio::task::yield_now().await;
+
+                execute_stage(stage_name, &rust_ctx, &mut rust_graph).map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "Stage '{}' failed: {}",
+                        stage_name, e
+                    ))
+                })?;
+            }
+
+            // Record execution completion
+            trace_sink.record(TraceEvent {
+                id: "pipeline.async.complete".to_string(),
+                message: format!(
+                    "Async pipeline completed successfully ({} stages)",
+                    stages.len()
+                ),
+                timestamp: SystemTime::now(),
+                level: TraceLevel::Info,
+                span_id: None,
+                trace_id: None,
+            });
+
             Ok(PyBuildGraph { inner: rust_graph })
         })
     }

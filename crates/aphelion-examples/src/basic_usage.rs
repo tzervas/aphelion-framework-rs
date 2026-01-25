@@ -83,10 +83,7 @@ pub fn run_example() -> AphelionResult<()> {
             println!("  Progress: [{}/{}] {}", current, total, stage_name);
         });
 
-    let ctx = BuildContext {
-        backend: &backend,
-        trace: &trace_sink,
-    };
+    let ctx = BuildContext::new(&backend, &trace_sink);
 
     println!("Executing BuildPipeline:");
     let result_graph = pipeline.execute(&ctx, graph)?;

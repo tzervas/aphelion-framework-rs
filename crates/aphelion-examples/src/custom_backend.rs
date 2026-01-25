@@ -161,10 +161,7 @@ pub fn run_example() -> AphelionResult<()> {
     graph.add_node("inference_layer", config.clone());
 
     let trace_sink = InMemoryTraceSink::new();
-    let ctx = BuildContext {
-        backend: &gpu_backend,
-        trace: &trace_sink,
-    };
+    let ctx = BuildContext::new(&gpu_backend, &trace_sink);
 
     println!("  Building with GPU backend:");
     let pipeline = BuildPipeline::new()
@@ -209,10 +206,7 @@ pub fn run_example() -> AphelionResult<()> {
     graph.add_node("tpu_layer", config);
 
     let trace_sink = InMemoryTraceSink::new();
-    let ctx = BuildContext {
-        backend: &tpu_backend,
-        trace: &trace_sink,
-    };
+    let ctx = BuildContext::new(&tpu_backend, &trace_sink);
 
     println!("  Building with TPU backend:");
     let pipeline = BuildPipeline::new();

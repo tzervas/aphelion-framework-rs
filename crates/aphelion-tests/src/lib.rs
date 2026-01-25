@@ -62,10 +62,7 @@ mod tests {
         };
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let result = BuildPipeline::build_with_validation(&model, ctx);
         assert!(result.is_ok());
@@ -92,10 +89,7 @@ mod tests {
         };
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
         let result = BuildPipeline::build_with_validation(&model, ctx);
         assert!(result.is_ok());
     }
@@ -245,10 +239,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let graph = BuildGraph::default();
         let result = pipeline.execute(&ctx, graph);
@@ -294,10 +285,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let graph = BuildGraph::default();
         let result = pipeline.execute(&ctx, graph);
@@ -342,10 +330,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let graph = BuildGraph::default();
         let result = pipeline.execute(&ctx, graph);
@@ -498,10 +483,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         // This should still build since the pipeline.build_with_validation
         // only checks name and version fields
@@ -630,10 +612,7 @@ mod tests {
         let pipeline = BuildPipeline::new().with_stage(stage);
 
         let backend = NullBackend::cpu();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &multi_sink,
-        };
+        let ctx = BuildContext::new(&backend, &multi_sink);
 
         let graph = BuildGraph::default();
         let result = pipeline.execute(&ctx, graph);
@@ -693,10 +672,7 @@ mod tests {
 
         let model = TestModel { config };
         let backend = NullBackend::cpu();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &exporter,
-        };
+        let ctx = BuildContext::new(&backend, &exporter);
 
         let result = BuildPipeline::build_with_validation(&model, ctx);
         assert!(result.is_ok());
@@ -757,10 +733,7 @@ mod tests {
         assert!(caps.supports_tf32);
 
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: selected_backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(selected_backend, &trace);
 
         let pipeline = BuildPipeline::new();
         let graph = BuildGraph::default();
@@ -841,10 +814,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let graph = BuildGraph::default();
         let result = pipeline.execute_async(&ctx, graph).await;
@@ -873,10 +843,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let result = pipeline.execute_async(&ctx, graph).await;
 
@@ -972,10 +939,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let graph = BuildGraph::default();
         let result = pipeline.execute_async(&ctx, graph).await;
@@ -1073,10 +1037,7 @@ mod tests {
             let stage = AccelerationStage::for_training(0.1);
             let backend = NullBackend::cpu();
             let trace = InMemoryTraceSink::new();
-            let ctx = BuildContext {
-                backend: &backend,
-                trace: &trace,
-            };
+            let ctx = BuildContext::new(&backend, &trace);
 
             let mut graph = BuildGraph::default();
             graph.add_node("linear1", ModelConfig::new("linear", "1.0"));
@@ -1110,10 +1071,7 @@ mod tests {
 
             let backend = NullBackend::cpu();
             let trace = InMemoryTraceSink::new();
-            let ctx = BuildContext {
-                backend: &backend,
-                trace: &trace,
-            };
+            let ctx = BuildContext::new(&backend, &trace);
 
             let mut graph = BuildGraph::default();
             graph.add_node("linear", ModelConfig::new("linear", "1.0"));
@@ -1147,10 +1105,7 @@ mod tests {
 
             let backend = NullBackend::cpu();
             let trace = InMemoryTraceSink::new();
-            let ctx = BuildContext {
-                backend: &backend,
-                trace: &trace,
-            };
+            let ctx = BuildContext::new(&backend, &trace);
 
             let mut graph = BuildGraph::default();
             graph.add_node("linear", ModelConfig::new("linear", "1.0"));
@@ -1175,10 +1130,7 @@ mod tests {
 
             let backend = NullBackend::cpu();
             let trace = InMemoryTraceSink::new();
-            let ctx = BuildContext {
-                backend: &backend,
-                trace: &trace,
-            };
+            let ctx = BuildContext::new(&backend, &trace);
 
             let mut graph = BuildGraph::default();
             graph.add_node("linear", ModelConfig::new("linear", "1.0"));
@@ -1203,10 +1155,7 @@ mod tests {
 
             let backend = NullBackend::cpu();
             let trace = InMemoryTraceSink::new();
-            let ctx = BuildContext {
-                backend: &backend,
-                trace: &trace,
-            };
+            let ctx = BuildContext::new(&backend, &trace);
 
             // Run pre-hook
             let result = pre_hook(&ctx);
@@ -1221,10 +1170,7 @@ mod tests {
 
             // Run post-hook
             let trace2 = InMemoryTraceSink::new();
-            let ctx2 = BuildContext {
-                backend: &backend,
-                trace: &trace2,
-            };
+            let ctx2 = BuildContext::new(&backend, &trace2);
             let result = post_hook(&ctx2, &graph);
             assert!(result.is_ok());
 
@@ -1238,10 +1184,7 @@ mod tests {
             backend.initialize().unwrap();
 
             let trace = InMemoryTraceSink::new();
-            let ctx = BuildContext {
-                backend: &backend,
-                trace: &trace,
-            };
+            let ctx = BuildContext::new(&backend, &trace);
 
             let stage = AccelerationStage::for_training(0.1);
             let mut graph = BuildGraph::default();
@@ -1320,10 +1263,7 @@ mod tests {
 
             let backend = NullBackend::cpu();
             let trace = InMemoryTraceSink::new();
-            let ctx = BuildContext {
-                backend: &backend,
-                trace: &trace,
-            };
+            let ctx = BuildContext::new(&backend, &trace);
 
             let mut graph = BuildGraph::default();
             graph.add_node("linear", ModelConfig::new("linear", "1.0"));
@@ -1395,10 +1335,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let graph = BuildGraph::default();
         let result = pipeline.execute_async(&ctx, graph).await;
@@ -1877,10 +1814,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         // Empty graph should trigger failure at stage1
         let graph = BuildGraph::default();
@@ -1919,10 +1853,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         // Graph with one node should fail at stage2
         let mut graph = BuildGraph::default();
@@ -1951,10 +1882,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         // First attempt with empty graph - should fail
         let empty_graph = BuildGraph::default();
@@ -1994,10 +1922,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let graph = BuildGraph::default();
         let result = pipeline.execute(&ctx, graph);
@@ -2031,10 +1956,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let graph = BuildGraph::default();
         let result = pipeline.execute(&ctx, graph);
@@ -2076,10 +1998,7 @@ mod tests {
 
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let graph = BuildGraph::default();
         let result = pipeline.execute(&ctx, graph);
@@ -2178,10 +2097,7 @@ mod tests {
             backend.initialize().unwrap();
 
             let trace = InMemoryTraceSink::new();
-            let ctx = BuildContext {
-                backend: &backend,
-                trace: &trace,
-            };
+            let ctx = BuildContext::new(&backend, &trace);
 
             // Verify backend is usable in pipeline context
             assert_eq!(ctx.backend.name(), "burn");
@@ -2211,10 +2127,7 @@ mod tests {
             backend.initialize().unwrap();
 
             let trace = InMemoryTraceSink::new();
-            let ctx = BuildContext {
-                backend: &backend,
-                trace: &trace,
-            };
+            let ctx = BuildContext::new(&backend, &trace);
 
             let counter = Arc::new(Mutex::new(0));
             let stage = Box::new(CountingStage::new("burn_test_stage", Arc::clone(&counter)));
@@ -2321,10 +2234,7 @@ mod tests {
             backend.initialize().unwrap();
 
             let trace = InMemoryTraceSink::new();
-            let ctx = BuildContext {
-                backend: &backend,
-                trace: &trace,
-            };
+            let ctx = BuildContext::new(&backend, &trace);
 
             // Verify backend is usable in pipeline context
             assert_eq!(ctx.backend.name(), "cubecl");
@@ -2354,10 +2264,7 @@ mod tests {
             backend.initialize().unwrap();
 
             let trace = InMemoryTraceSink::new();
-            let ctx = BuildContext {
-                backend: &backend,
-                trace: &trace,
-            };
+            let ctx = BuildContext::new(&backend, &trace);
 
             let counter = Arc::new(Mutex::new(0));
             let stage = Box::new(CountingStage::new(
