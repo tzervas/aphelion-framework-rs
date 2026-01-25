@@ -134,13 +134,13 @@ jobs:
 
       - name: Build sdist
         working-directory: crates/aphelion-python
-        run: maturin sdist
+        run: maturin sdist --out dist
 
       - name: Upload sdist artifact
         uses: actions/upload-artifact@v4
         with:
           name: sdist
-          path: crates/aphelion-python/target/wheels/*.tar.gz
+          path: crates/aphelion-python/dist/*.tar.gz
 
   # Publish to PyPI
   publish-pypi:
