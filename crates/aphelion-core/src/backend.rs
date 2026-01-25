@@ -7,7 +7,7 @@
 
 use crate::diagnostics::TraceSink;
 use crate::error::AphelionResult;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Device capabilities and features.
 ///
@@ -242,7 +242,7 @@ impl Backend for NullBackend {
 /// assert_eq!(available.len(), 2);
 /// ```
 pub struct BackendRegistry {
-    backends: HashMap<String, Box<dyn Backend>>,
+    backends: BTreeMap<String, Box<dyn Backend>>,
 }
 
 impl BackendRegistry {
@@ -258,7 +258,7 @@ impl BackendRegistry {
     /// ```
     pub fn new() -> Self {
         Self {
-            backends: HashMap::new(),
+            backends: BTreeMap::new(),
         }
     }
 
@@ -331,12 +331,107 @@ impl BackendRegistry {
     pub fn list_available(&self) -> Vec<&str> {
         self.backends.keys().map(|k| k.as_str()).collect()
     }
+
+    /// Returns the first available backend, preferring non-null backends.
+    ///
+    /// This method implements deterministic auto-detection by:
+    /// 1. Iterating through backends in alphabetical order (BTreeMap ordering)
+    /// 2. Filtering for available backends
+    /// 3. Returning the first non-null backend if available
+    /// 4. Falling back to any available backend (including null) if no non-null backend exists
+    ///
+    /// # Returns
+    ///
+    /// `Some(&dyn Backend)` for the first available non-null backend, or the first
+    /// available backend overall; `None` if no backends are available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::backend::{BackendRegistry, NullBackend, MockBackend};
+    ///
+    /// let mut registry = BackendRegistry::new();
+    /// registry.register(Box::new(NullBackend::cpu()));
+    /// registry.register(Box::new(MockBackend::new("cpu", "cpu")));
+    ///
+    /// let backend = registry.auto_detect();
+    /// assert!(backend.is_some());
+    /// // Prefers "cpu" MockBackend over "null" NullBackend
+    /// assert_eq!(backend.unwrap().name(), "cpu");
+    /// ```
+    pub fn auto_detect(&self) -> Option<&dyn Backend> {
+        self.backends
+            .values()
+            .filter(|b| b.is_available())
+            .find(|b| b.name() != "null")
+            .or_else(|| self.backends.values().find(|b| b.is_available()))
+            .map(|b| b.as_ref())
+    }
+
+    /// Returns the first available backend from the preference list.
+    ///
+    /// This method iterates through the provided list of backend names in order
+    /// and returns the first one that is both registered and available.
+    /// It does not determine "best" - just returns the first matching preference.
+    ///
+    /// # Arguments
+    ///
+    /// * `names` - Slice of backend names to check in order of preference
+    ///
+    /// # Returns
+    ///
+    /// `Some(&dyn Backend)` for the first matching available backend in the preference list;
+    /// `None` if none of the preferred backends are available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::backend::{BackendRegistry, MockBackend};
+    ///
+    /// let mut registry = BackendRegistry::new();
+    /// registry.register(Box::new(MockBackend::new("cuda", "gpu").with_availability(false)));
+    /// registry.register(Box::new(MockBackend::new("cpu", "cpu")));
+    ///
+    /// let backend = registry.prefer(&["cuda", "cpu"]);
+    /// assert!(backend.is_some());
+    /// // Returns "cpu" since "cuda" is not available
+    /// assert_eq!(backend.unwrap().name(), "cpu");
+    /// ```
+    pub fn prefer(&self, names: &[&str]) -> Option<&dyn Backend> {
+        for name in names {
+            if let Some(backend) = self.backends.get(*name) {
+                if backend.is_available() {
+                    return Some(backend.as_ref());
+                }
+            }
+        }
+        None
+    }
 }
 
 impl Default for BackendRegistry {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Returns a default backend suitable for testing and basic usage.
+///
+/// # Returns
+///
+/// A `NullBackend` configured for CPU execution.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::backend::{Backend, default_backend};
+///
+/// let backend = default_backend();
+/// assert_eq!(backend.name(), "null");
+/// assert!(backend.is_available());
+/// ```
+pub fn default_backend() -> NullBackend {
+    NullBackend::cpu()
 }
 
 /// Mock backend implementation for testing purposes.
@@ -828,5 +923,96 @@ mod tests {
         assert_eq!(backend1.name(), backend2.name());
         assert_eq!(backend1.device(), backend2.device());
         assert_eq!(backend1.is_available(), backend2.is_available());
+    }
+
+    #[test]
+    fn test_backend_auto_detect_prefers_non_null() {
+        let mut registry = BackendRegistry::new();
+        registry.register(Box::new(NullBackend::cpu()));
+        registry.register(Box::new(MockBackend::new("cpu", "cpu")));
+
+        let backend = registry.auto_detect();
+        assert!(backend.is_some());
+        // Should prefer "cpu" MockBackend over "null" NullBackend
+        assert_eq!(backend.unwrap().name(), "cpu");
+    }
+
+    #[test]
+    fn test_backend_auto_detect_returns_available() {
+        let mut registry = BackendRegistry::new();
+        registry.register(Box::new(
+            MockBackend::new("gpu", "gpu").with_availability(false),
+        ));
+        registry.register(Box::new(NullBackend::cpu()));
+
+        let backend = registry.auto_detect();
+        assert!(backend.is_some());
+        // Should return null backend since gpu is unavailable
+        assert_eq!(backend.unwrap().name(), "null");
+    }
+
+    #[test]
+    fn test_backend_auto_detect_none_when_no_available() {
+        let registry = BackendRegistry::new();
+        let backend = registry.auto_detect();
+        assert!(backend.is_none());
+    }
+
+    #[test]
+    fn test_backend_prefer_respects_order() {
+        let mut registry = BackendRegistry::new();
+        registry.register(Box::new(MockBackend::new("cuda", "gpu")));
+        registry.register(Box::new(MockBackend::new("cpu", "cpu")));
+
+        let backend = registry.prefer(&["cuda", "cpu"]);
+        assert!(backend.is_some());
+        // Should return "cuda" since it comes first in the preference list
+        assert_eq!(backend.unwrap().name(), "cuda");
+    }
+
+    #[test]
+    fn test_backend_prefer_skips_unavailable() {
+        let mut registry = BackendRegistry::new();
+        registry.register(Box::new(
+            MockBackend::new("cuda", "gpu").with_availability(false),
+        ));
+        registry.register(Box::new(MockBackend::new("cpu", "cpu")));
+
+        let backend = registry.prefer(&["cuda", "cpu"]);
+        assert!(backend.is_some());
+        // Should skip unavailable "cuda" and return "cpu"
+        assert_eq!(backend.unwrap().name(), "cpu");
+    }
+
+    #[test]
+    fn test_backend_prefer_none_when_no_match() {
+        let mut registry = BackendRegistry::new();
+        registry.register(Box::new(MockBackend::new("cuda", "gpu")));
+
+        let backend = registry.prefer(&["metal", "rocm"]);
+        assert!(backend.is_none());
+    }
+
+    #[test]
+    fn test_backend_auto_detect_deterministic_ordering() {
+        // BTreeMap should provide deterministic iteration order
+        // This test verifies that auto_detect gives consistent results
+        let mut registry = BackendRegistry::new();
+        registry.register(Box::new(MockBackend::new("zebra", "gpu")));
+        registry.register(Box::new(MockBackend::new("apple", "cpu")));
+        registry.register(Box::new(MockBackend::new("monkey", "tpu")));
+
+        // Should return "apple" (first alphabetically among non-null backends)
+        let backend = registry.auto_detect();
+        assert!(backend.is_some());
+        assert_eq!(backend.unwrap().name(), "apple");
+    }
+
+    #[test]
+    fn test_default_backend_function() {
+        let backend = default_backend();
+        assert_eq!(backend.name(), "null");
+        assert_eq!(backend.device(), "cpu");
+        assert!(backend.is_available());
     }
 }
