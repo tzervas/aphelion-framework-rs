@@ -996,12 +996,11 @@ mod tests {
     mod tritter_accel_tests {
         use super::*;
         use aphelion_core::acceleration::{
-            AccelerationStage, InferenceAccelConfig, TrainingAccelConfig,
-            gradient_compression_post_hook, gradient_compression_pre_hook,
-            inference_pipeline, training_pipeline,
+            gradient_compression_post_hook, gradient_compression_pre_hook, inference_pipeline,
+            training_pipeline, AccelerationStage, InferenceAccelConfig, TrainingAccelConfig,
         };
         use aphelion_core::tritter_backend::{
-            TriterAccelBackend, TriterDevice, TrainingConfig, InferenceConfig,
+            InferenceConfig, TrainingConfig, TriterAccelBackend, TriterDevice,
         };
 
         #[test]
@@ -1165,7 +1164,9 @@ mod tests {
             assert!(events
                 .iter()
                 .any(|e| e.message.contains("Applied training acceleration")));
-            assert!(events.iter().any(|e| e.message.contains("computed graph hash")));
+            assert!(events
+                .iter()
+                .any(|e| e.message.contains("computed graph hash")));
         }
 
         #[test]
@@ -1190,7 +1191,9 @@ mod tests {
             assert!(events
                 .iter()
                 .any(|e| e.message.contains("Applied inference acceleration")));
-            assert!(events.iter().any(|e| e.message.contains("computed graph hash")));
+            assert!(events
+                .iter()
+                .any(|e| e.message.contains("computed graph hash")));
         }
 
         #[test]
@@ -1604,7 +1607,10 @@ mod tests {
                     for event_id in 0..events_per_thread {
                         let event = TraceEvent {
                             id: format!("thread-{}-event-{}", thread_id, event_id),
-                            message: format!("Message from thread {} event {}", thread_id, event_id),
+                            message: format!(
+                                "Message from thread {} event {}",
+                                thread_id, event_id
+                            ),
                             timestamp: SystemTime::now(),
                             level: TraceLevel::Info,
                             span_id: Some(format!("span-{}", thread_id)),
@@ -1669,10 +1675,22 @@ mod tests {
         assert_eq!(events.len(), num_threads * 4);
 
         // Count events by level
-        let debug_count = events.iter().filter(|e| matches!(e.level, TraceLevel::Debug)).count();
-        let info_count = events.iter().filter(|e| matches!(e.level, TraceLevel::Info)).count();
-        let warn_count = events.iter().filter(|e| matches!(e.level, TraceLevel::Warn)).count();
-        let error_count = events.iter().filter(|e| matches!(e.level, TraceLevel::Error)).count();
+        let debug_count = events
+            .iter()
+            .filter(|e| matches!(e.level, TraceLevel::Debug))
+            .count();
+        let info_count = events
+            .iter()
+            .filter(|e| matches!(e.level, TraceLevel::Info))
+            .count();
+        let warn_count = events
+            .iter()
+            .filter(|e| matches!(e.level, TraceLevel::Warn))
+            .count();
+        let error_count = events
+            .iter()
+            .filter(|e| matches!(e.level, TraceLevel::Error))
+            .count();
 
         assert_eq!(debug_count, num_threads);
         assert_eq!(info_count, num_threads);
@@ -1852,9 +1870,8 @@ mod tests {
                 .with_message("No nodes in graph")
                 .with_counter(Arc::clone(&counter)),
         );
-        let stage2 = Box::new(
-            ConditionalFailureStage::new("stage2").with_counter(Arc::clone(&counter)),
-        );
+        let stage2 =
+            Box::new(ConditionalFailureStage::new("stage2").with_counter(Arc::clone(&counter)));
 
         let pipeline = BuildPipeline::new().with_stage(stage1).with_stage(stage2);
 
@@ -1884,18 +1901,16 @@ mod tests {
     fn pipeline_recovery_failure_at_middle_stage() {
         let counter = Arc::new(Mutex::new(0));
 
-        let stage1 = Box::new(
-            ConditionalFailureStage::new("stage1").with_counter(Arc::clone(&counter)),
-        );
+        let stage1 =
+            Box::new(ConditionalFailureStage::new("stage1").with_counter(Arc::clone(&counter)));
         let stage2 = Box::new(
             ConditionalFailureStage::new("stage2")
                 .fail_when_nodes_equal(1)
                 .with_message("Single node not allowed")
                 .with_counter(Arc::clone(&counter)),
         );
-        let stage3 = Box::new(
-            ConditionalFailureStage::new("stage3").with_counter(Arc::clone(&counter)),
-        );
+        let stage3 =
+            Box::new(ConditionalFailureStage::new("stage3").with_counter(Arc::clone(&counter)));
 
         let pipeline = BuildPipeline::new()
             .with_stage(stage1)
@@ -1929,9 +1944,8 @@ mod tests {
                 .fail_when_nodes_equal(0)
                 .with_counter(Arc::clone(&counter)),
         );
-        let stage2 = Box::new(
-            ConditionalFailureStage::new("stage2").with_counter(Arc::clone(&counter)),
-        );
+        let stage2 =
+            Box::new(ConditionalFailureStage::new("stage2").with_counter(Arc::clone(&counter)));
 
         let pipeline = BuildPipeline::new().with_stage(stage1).with_stage(stage2);
 
@@ -1964,12 +1978,13 @@ mod tests {
         let hook_counter = Arc::new(Mutex::new(0));
 
         let hook_counter_clone = Arc::clone(&hook_counter);
-        let failing_pre_hook = move |_ctx: &BuildContext| -> aphelion_core::error::AphelionResult<()> {
-            *hook_counter_clone.lock().unwrap() += 1;
-            Err(aphelion_core::error::AphelionError::build(
-                "Pre-hook validation failed",
-            ))
-        };
+        let failing_pre_hook =
+            move |_ctx: &BuildContext| -> aphelion_core::error::AphelionResult<()> {
+                *hook_counter_clone.lock().unwrap() += 1;
+                Err(aphelion_core::error::AphelionError::build(
+                    "Pre-hook validation failed",
+                ))
+            };
 
         let stage = Box::new(CountingStage::new("stage", Arc::clone(&stage_counter)));
 
@@ -2000,12 +2015,13 @@ mod tests {
     fn pipeline_post_hook_failure_after_successful_stages() {
         let stage_counter = Arc::new(Mutex::new(0));
 
-        let failing_post_hook =
-            move |_ctx: &BuildContext, _graph: &BuildGraph| -> aphelion_core::error::AphelionResult<()> {
-                Err(aphelion_core::error::AphelionError::build(
-                    "Post-hook cleanup failed",
-                ))
-            };
+        let failing_post_hook = move |_ctx: &BuildContext,
+                                      _graph: &BuildGraph|
+              -> aphelion_core::error::AphelionResult<()> {
+            Err(aphelion_core::error::AphelionError::build(
+                "Post-hook cleanup failed",
+            ))
+        };
 
         let stage = Box::new(CountingStage::new("stage", Arc::clone(&stage_counter)));
 
@@ -2344,7 +2360,10 @@ mod tests {
             };
 
             let counter = Arc::new(Mutex::new(0));
-            let stage = Box::new(CountingStage::new("cubecl_test_stage", Arc::clone(&counter)));
+            let stage = Box::new(CountingStage::new(
+                "cubecl_test_stage",
+                Arc::clone(&counter),
+            ));
 
             let pipeline = BuildPipeline::new().with_stage(stage);
 

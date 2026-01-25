@@ -348,10 +348,8 @@ impl AccelerationStage {
                 serde_json::Value::Bool(config.use_ternary_layers),
             );
             if config.use_kv_cache {
-                node.metadata.insert(
-                    "accel.kv_cache".to_string(),
-                    serde_json::Value::Bool(true),
-                );
+                node.metadata
+                    .insert("accel.kv_cache".to_string(), serde_json::Value::Bool(true));
                 if let Some(max_seq_len) = config.max_seq_len {
                     node.metadata.insert(
                         "accel.max_seq_len".to_string(),
@@ -391,12 +389,8 @@ impl PipelineStage for AccelerationStage {
 
     fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()> {
         match &self.mode {
-            AccelMode::Training(config) => {
-                self.apply_training_acceleration(ctx, graph, config)
-            }
-            AccelMode::Inference(config) => {
-                self.apply_inference_acceleration(ctx, graph, config)
-            }
+            AccelMode::Training(config) => self.apply_training_acceleration(ctx, graph, config),
+            AccelMode::Inference(config) => self.apply_inference_acceleration(ctx, graph, config),
         }
     }
 }

@@ -593,8 +593,7 @@ pub trait GraphAdapter: Send + Sync {
 pub trait RuntimeAdapter: Send + Sync {
     type Output;
 
-    fn execute(&self, graph: &RacComputeGraph, device: &RacDevice)
-        -> AphelionResult<Self::Output>;
+    fn execute(&self, graph: &RacComputeGraph, device: &RacDevice) -> AphelionResult<Self::Output>;
 
     fn is_device_available(&self, device: &RacDevice) -> bool;
 
@@ -775,11 +774,7 @@ pub struct PlaceholderOutput {
 impl RuntimeAdapter for PlaceholderRuntime {
     type Output = PlaceholderOutput;
 
-    fn execute(
-        &self,
-        graph: &RacComputeGraph,
-        device: &RacDevice,
-    ) -> AphelionResult<Self::Output> {
+    fn execute(&self, graph: &RacComputeGraph, device: &RacDevice) -> AphelionResult<Self::Output> {
         if !self.is_device_available(device) {
             return Err(AphelionError::backend(format!(
                 "Device not available: {}",

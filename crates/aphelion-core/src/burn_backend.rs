@@ -275,9 +275,7 @@ impl Clone for BurnBackend {
     fn clone(&self) -> Self {
         Self {
             config: self.config.clone(),
-            initialized: Arc::new(AtomicBool::new(
-                self.initialized.load(Ordering::SeqCst),
-            )),
+            initialized: Arc::new(AtomicBool::new(self.initialized.load(Ordering::SeqCst))),
         }
     }
 }
@@ -430,7 +428,7 @@ impl Backend for BurnBackend {
                 supports_tf32: self.config.allow_tf32,
                 // Placeholder values - actual implementation would query the device
                 max_memory_bytes: Some(8 * 1024 * 1024 * 1024), // 8 GB placeholder
-                compute_units: Some(128), // Placeholder
+                compute_units: Some(128),                       // Placeholder
             },
             BurnDevice::Metal(_) => DeviceCapabilities {
                 supports_f16: true,

@@ -394,9 +394,7 @@ impl Clone for CubeclBackend {
     fn clone(&self) -> Self {
         Self {
             config: self.config.clone(),
-            initialized: Arc::new(AtomicBool::new(
-                self.initialized.load(Ordering::SeqCst),
-            )),
+            initialized: Arc::new(AtomicBool::new(self.initialized.load(Ordering::SeqCst))),
         }
     }
 }
@@ -613,7 +611,7 @@ impl Backend for CubeclBackend {
                 supports_tf32: true,
                 // Placeholder values - actual implementation would query the device
                 max_memory_bytes: Some(8 * 1024 * 1024 * 1024), // 8 GB placeholder
-                compute_units: Some(128), // Placeholder
+                compute_units: Some(128),                       // Placeholder
             },
             CubeclDevice::Metal(_) => DeviceCapabilities {
                 supports_f16: true,
@@ -822,8 +820,7 @@ mod tests {
 
     #[test]
     fn test_cubecl_backend_config_builder_chain() {
-        let config = CubeclBackendConfig::cuda(0)
-            .with_memory_fraction(0.7);
+        let config = CubeclBackendConfig::cuda(0).with_memory_fraction(0.7);
         assert_eq!(config.device, CubeclDevice::Cuda(0));
         assert!((config.memory_fraction - 0.7).abs() < f32::EPSILON);
     }
@@ -1022,9 +1019,7 @@ mod tests {
 
     #[test]
     fn test_cubecl_backend_clone_preserves_config() {
-        let backend = CubeclBackend::new(
-            CubeclBackendConfig::cuda(1).with_memory_fraction(0.5)
-        );
+        let backend = CubeclBackend::new(CubeclBackendConfig::cuda(1).with_memory_fraction(0.5));
         let cloned = backend.clone();
 
         assert_eq!(cloned.config().device, CubeclDevice::Cuda(1));
@@ -1057,9 +1052,7 @@ mod tests {
 
     #[test]
     fn test_cubecl_backend_config_access() {
-        let backend = CubeclBackend::new(
-            CubeclBackendConfig::cuda(2).with_memory_fraction(0.75)
-        );
+        let backend = CubeclBackend::new(CubeclBackendConfig::cuda(2).with_memory_fraction(0.75));
 
         let config = backend.config();
         assert_eq!(config.device, CubeclDevice::Cuda(2));
