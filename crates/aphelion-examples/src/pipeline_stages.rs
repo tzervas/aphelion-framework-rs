@@ -42,8 +42,8 @@ impl PipelineStage for ValidateStructureStage {
         });
 
         if graph.node_count() == 0 {
-            return Err(aphelion_core::error::AphelionError::Validation(
-                "Graph must contain at least one node".to_string(),
+            return Err(aphelion_core::error::AphelionError::validation(
+                "Graph must contain at least one node",
             ));
         }
 

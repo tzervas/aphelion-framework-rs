@@ -109,11 +109,11 @@ Each criterion is **test-backed** where possible and **documented**.
 - Today's design enables tomorrow's features.
 
 ## 7) Compliance Checklist (v1.1.0)
-- [ ] SC-6 pass + documented
-- [ ] SC-7 pass + documented
-- [ ] SC-8 pass + documented
-- [ ] SC-9 pass + documented
-- [ ] SC-10 pass + documented
-- [ ] SC-11 pass + documented
-- [ ] SC-12 pass + documented
-- [ ] SC-13 pass + documented
+- [x] SC-6 pass + documented
+- [x] SC-7 pass + documented
+- [x] SC-8 pass + documented
+- [x] SC-9 pass + documented
+- [x] SC-10 pass + documented
+- [x] SC-11 pass + documented
+- [x] SC-12 pass + documented
+- [x] SC-13 pass + documented
