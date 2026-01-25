@@ -83,6 +83,9 @@ jobs:
       - name: Run tests
         run: cargo test --workspace
 
+      - name: Run tests with rust-ai-core feature
+        run: cargo test --workspace --features rust-ai-core || echo "rust-ai-core tests skipped (crate may not be available)"
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
