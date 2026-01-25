@@ -1,0 +1,32 @@
+[package]
+name = "aphelion-python"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Python bindings for the Aphelion AI framework"
+readme = "README.md"
+repository.workspace = true
+keywords = ["python", "bindings", "pyo3", "ai", "machine-learning"]
+categories = ["api-bindings", "science"]
+
+[lib]
+name = "aphelion"
+crate-type = ["cdylib"]
+
+[dependencies]
+aphelion-core = { path = "../aphelion-core" }
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py39"] }
+pyo3-async-runtimes = { version = "0.22", features = ["tokio-runtime"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+serde_json = "1"
+pythonize = "0.22"
+
+[features]
+default = []
+burn = ["aphelion-core/burn"]
+cubecl = ["aphelion-core/cubecl"]
+rust-ai-core = ["aphelion-core/rust-ai-core"]
+tritter-accel = ["aphelion-core/tritter-accel"]
+# Build all optional backends
+full = ["burn", "cubecl", "rust-ai-core", "tritter-accel"]
