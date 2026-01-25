@@ -78,7 +78,7 @@ Each criterion is **test-backed** where possible and **documented**.
 
 ### SC-12: Backend auto-detection
 - **Test**: `backend_auto_detect`
-- **Contract**: `Backend::auto_detect()` returns best available backend
+- **Contract**: `BackendRegistry::auto_detect()` returns best available backend
 
 ### SC-13: Async pipeline execution
 - **Test**: `async_pipeline_executes`

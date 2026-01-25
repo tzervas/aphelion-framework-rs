@@ -832,6 +832,12 @@ impl PipelineStage for HashingStage {
 /// Async implementation for ValidationStage.
 ///
 /// This allows ValidationStage to be used in async pipelines when the `tokio` feature is enabled.
+///
+/// # Note
+///
+/// This implementation delegates to the synchronous `execute()` method without yielding.
+/// For fast operations like validation, this is acceptable. For CPU-intensive stages,
+/// consider using `tokio::task::spawn_blocking()` in your custom implementations.
 #[cfg(feature = "tokio")]
 impl AsyncPipelineStage for ValidationStage {
     fn name(&self) -> &str {
@@ -845,6 +851,7 @@ impl AsyncPipelineStage for ValidationStage {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = AphelionResult<()>> + Send + 'a>> {
         Box::pin(async move {
             // Delegate to the synchronous implementation
+            // Note: This does not yield to the async runtime - acceptable for fast operations
             self.execute(ctx, graph)
         })
     }
@@ -853,6 +860,12 @@ impl AsyncPipelineStage for ValidationStage {
 /// Async implementation for HashingStage.
 ///
 /// This allows HashingStage to be used in async pipelines when the `tokio` feature is enabled.
+///
+/// # Note
+///
+/// This implementation delegates to the synchronous `execute()` method without yielding.
+/// For fast operations like hashing, this is acceptable. For CPU-intensive stages,
+/// consider using `tokio::task::spawn_blocking()` in your custom implementations.
 #[cfg(feature = "tokio")]
 impl AsyncPipelineStage for HashingStage {
     fn name(&self) -> &str {

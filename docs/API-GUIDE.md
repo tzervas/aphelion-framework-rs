@@ -82,27 +82,26 @@ let config = ModelConfig::new("model", "1.0.0")
     .with_param("learning_rate", serde_json::json!(0.001))
     .with_param("batch_size", serde_json::json!(32));
 
-// Type-safe parameter access
-let lr: f64 = config.param("learning_rate")
-    .unwrap_or(0.01);
+// Type-safe parameter access with defaults
+let lr: f64 = config.param_or("learning_rate", 0.01)?;
 
-let batch_size: u32 = config.param("batch_size")
-    .unwrap_or(16);
+let batch_size: u32 = config.param_or("batch_size", 16)?;
 ```
 
-### Configuration Presets
+### Using ModelConfigBuilder
 
 ```rust
-use aphelion_core::config::{ModelConfig, ModelConfigBuilder};
+use aphelion_core::config::ModelConfigBuilder;
 
 // Using the builder for complex configurations
-let config = ModelConfigBuilder::new("bert-base")
+let config = ModelConfigBuilder::new()
+    .name("bert-base")
     .version("1.0.0")
-    .with_preset("bert-base-uncased")
-    .param("hidden_size", 768)
-    .param("num_layers", 12)
-    .param("num_heads", 12)
-    .build()?;
+    .param("hidden_size", serde_json::json!(768))
+    .param("num_layers", serde_json::json!(12))
+    .param("num_heads", serde_json::json!(12))
+    .build()
+    .expect("valid config");
 ```
 
 ## Pipeline Usage
@@ -311,12 +310,12 @@ fn main() -> AphelionResult<()> {
 ### Backend Registry and Auto-Detection
 
 ```rust
-use aphelion_core::backend::BackendRegistry;
+use aphelion_core::backend::{BackendRegistry, NullBackend};
 
 // Create a registry and auto-detect best available backend
 let mut registry = BackendRegistry::new();
-registry.register("cpu", Box::new(NullBackend::cpu()));
-// registry.register("gpu", Box::new(MyGpuBackend::new(0)));
+registry.register(Box::new(NullBackend::cpu()));
+// registry.register(Box::new(MyGpuBackend::new(0)));
 
 if let Some(backend) = registry.auto_detect() {
     println!("Using backend: {}", backend.name());
@@ -394,7 +393,7 @@ impl PipelineStage for MetadataInjectionStage {
                 "injected_timestamp".to_string(),
                 serde_json::json!(std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or_else(|_| std::time::Duration::from_secs(0))
                     .as_secs())
             );
             node.metadata.insert(
