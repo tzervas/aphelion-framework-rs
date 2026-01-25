@@ -4,8 +4,10 @@
 //! parameters, and metadata. Configurations use deterministic ordering for reproducibility
 //! and support semantic versioning for tracking model iterations.
 
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::BTreeMap;
+
+use crate::error::{AphelionError, AphelionResult};
 
 /// Generic model configuration container with deterministic ordering.
 ///
@@ -199,6 +201,132 @@ impl ModelConfig {
             .into_iter()
             .collect(),
         }
+    }
+
+    /// Retrieves and deserializes a typed parameter value.
+    ///
+    /// Extracts a parameter from the configuration and deserializes it into the specified type.
+    /// This provides type-safe access to configuration parameters with automatic conversion.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Parameter key to retrieve
+    ///
+    /// # Errors
+    ///
+    /// Returns `AphelionError::InvalidConfig` if:
+    /// - The key does not exist in the parameters
+    /// - The value cannot be deserialized into the requested type
+    /// The error message includes the key name and expected type information.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::config::ModelConfig;
+    ///
+    /// let config = ModelConfig::new("model", "1.0.0")
+    ///     .with_param("hidden_size", serde_json::json!(512))
+    ///     .with_param("dropout", serde_json::json!(0.1));
+    ///
+    /// let hidden_size: u32 = config.param("hidden_size").expect("failed to get hidden_size");
+    /// assert_eq!(hidden_size, 512);
+    ///
+    /// let result: Result<i32, _> = config.param("nonexistent");
+    /// assert!(result.is_err());
+    /// ```
+    pub fn param<T: DeserializeOwned>(&self, key: &str) -> AphelionResult<T> {
+        let value = self.params.get(key).ok_or_else(|| {
+            AphelionError::InvalidConfig(format!(
+                "parameter '{}' not found in configuration",
+                key
+            ))
+        })?;
+
+        serde_json::from_value(value.clone()).map_err(|e| {
+            AphelionError::InvalidConfig(format!(
+                "failed to deserialize parameter '{}' to type '{}': {}",
+                key,
+                std::any::type_name::<T>(),
+                e
+            ))
+        })
+    }
+
+    /// Retrieves and deserializes a typed parameter, or returns a default if missing.
+    ///
+    /// Attempts to retrieve and deserialize a parameter, but returns the provided default
+    /// value if the key is not found. If the key exists but cannot be deserialized,
+    /// returns an error.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Parameter key to retrieve
+    /// * `default` - Default value to return if key is missing
+    ///
+    /// # Errors
+    ///
+    /// Returns `AphelionError::InvalidConfig` if the key exists but cannot be deserialized
+    /// to the requested type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::config::ModelConfig;
+    ///
+    /// let config = ModelConfig::new("model", "1.0.0")
+    ///     .with_param("learning_rate", serde_json::json!(0.001));
+    ///
+    /// let lr: f64 = config.param_or("learning_rate", 0.0001).expect("failed to get learning_rate");
+    /// assert_eq!(lr, 0.001);
+    ///
+    /// let momentum: f64 = config.param_or("momentum", 0.9).expect("failed to get momentum");
+    /// assert_eq!(momentum, 0.9);
+    /// ```
+    pub fn param_or<T: DeserializeOwned>(&self, key: &str, default: T) -> AphelionResult<T> {
+        match self.params.get(key) {
+            None => Ok(default),
+            Some(value) => serde_json::from_value(value.clone()).map_err(|e| {
+                AphelionError::InvalidConfig(format!(
+                    "failed to deserialize parameter '{}' to type '{}': {}",
+                    key,
+                    std::any::type_name::<T>(),
+                    e
+                ))
+            }),
+        }
+    }
+
+    /// Retrieves and deserializes a typed parameter, or returns the type's default value.
+    ///
+    /// Attempts to retrieve and deserialize a parameter, but returns `T::default()` if the key
+    /// is not found. This is a convenience method that works only with types that implement `Default`.
+    /// If the key exists but cannot be deserialized, returns an error.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Parameter key to retrieve
+    ///
+    /// # Errors
+    ///
+    /// Returns `AphelionError::InvalidConfig` if the key exists but cannot be deserialized
+    /// to the requested type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::config::ModelConfig;
+    ///
+    /// let config = ModelConfig::new("model", "1.0.0")
+    ///     .with_param("seed", serde_json::json!(42));
+    ///
+    /// let seed: u32 = config.param_or_default("seed").expect("failed to get seed");
+    /// assert_eq!(seed, 42);
+    ///
+    /// let threads: u32 = config.param_or_default("threads").expect("failed to get threads");
+    /// assert_eq!(threads, 0); // Default value for u32
+    /// ```
+    pub fn param_or_default<T: DeserializeOwned + Default>(&self, key: &str) -> AphelionResult<T> {
+        self.param_or(key, T::default())
     }
 }
 
@@ -603,5 +731,118 @@ mod tests {
 
         assert!(small_layers < medium_layers);
         assert!(medium_layers < large_layers);
+    }
+
+    #[test]
+    fn test_typed_param_success() {
+        let config = ModelConfig::new("model", "1.0.0")
+            .with_param("hidden_size", serde_json::json!(512))
+            .with_param("dropout", serde_json::json!(0.1))
+            .with_param("layers", serde_json::json!(4))
+            .with_param("activation", serde_json::json!("relu"));
+
+        let hidden_size: u32 = config.param("hidden_size").expect("failed to get hidden_size");
+        assert_eq!(hidden_size, 512);
+
+        let dropout: f32 = config.param("dropout").expect("failed to get dropout");
+        assert!((dropout - 0.1).abs() < 0.0001, "dropout mismatch: {}", dropout);
+
+        let layers: u32 = config.param("layers").expect("failed to get layers");
+        assert_eq!(layers, 4);
+
+        let activation: String = config
+            .param("activation")
+            .expect("failed to get activation");
+        assert_eq!(activation, "relu");
+    }
+
+    #[test]
+    fn test_typed_param_missing_key() {
+        let config = ModelConfig::new("model", "1.0.0")
+            .with_param("hidden_size", serde_json::json!(512));
+
+        let result: Result<u32, _> = config.param("nonexistent");
+        assert!(result.is_err());
+
+        let err = result.unwrap_err();
+        assert!(err.message().contains("nonexistent"));
+        assert!(err.message().contains("not found"));
+    }
+
+    #[test]
+    fn test_typed_param_wrong_type() {
+        let config = ModelConfig::new("model", "1.0.0")
+            .with_param("hidden_size", serde_json::json!(512))
+            .with_param("activation", serde_json::json!("relu"));
+
+        // Try to deserialize string as u32
+        let result: Result<u32, _> = config.param("activation");
+        assert!(result.is_err());
+
+        let err = result.unwrap_err();
+        assert!(err.message().contains("activation"));
+        assert!(err.message().contains("u32"));
+
+        // Try to deserialize u32 as string
+        let result: Result<String, _> = config.param("hidden_size");
+        assert!(result.is_err());
+
+        let err = result.unwrap_err();
+        assert!(err.message().contains("hidden_size"));
+    }
+
+    #[test]
+    fn test_param_or_default() {
+        let config = ModelConfig::new("model", "1.0.0")
+            .with_param("seed", serde_json::json!(42));
+
+        // Existing parameter
+        let seed: u32 = config
+            .param_or_default("seed")
+            .expect("failed to get seed");
+        assert_eq!(seed, 42);
+
+        // Missing parameter with Default
+        let threads: u32 = config
+            .param_or_default("threads")
+            .expect("failed to get threads");
+        assert_eq!(threads, 0);
+
+        // Missing parameter with String default
+        let name: String = config
+            .param_or_default("name")
+            .expect("failed to get name");
+        assert_eq!(name, "");
+    }
+
+    #[test]
+    fn test_param_or_with_default() {
+        let config = ModelConfig::new("model", "1.0.0")
+            .with_param("learning_rate", serde_json::json!(0.001));
+
+        // Existing parameter
+        let lr: f64 = config
+            .param_or("learning_rate", 0.0001)
+            .expect("failed to get learning_rate");
+        assert_eq!(lr, 0.001);
+
+        // Missing parameter with provided default
+        let momentum: f64 = config
+            .param_or("momentum", 0.9)
+            .expect("failed to get momentum");
+        assert_eq!(momentum, 0.9);
+
+        // Existing but wrong type
+        let result: Result<u32, _> = config.param_or("learning_rate", 100);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_param_with_complex_types() {
+        let config = ModelConfig::new("model", "1.0.0")
+            .with_param("values", serde_json::json!(vec![1, 2, 3, 4]));
+
+        let values: Vec<u32> = config.param("values").expect("failed to get values");
+        assert_eq!(values, vec![1, 2, 3, 4]);
     }
 }
