@@ -7,6 +7,7 @@ pub mod error;
 pub mod graph;
 pub mod pipeline;
 pub mod prelude;
+pub mod validation;
 
 #[cfg(feature = "rust-ai-core")]
 pub mod rust_ai_core;
