@@ -6,7 +6,7 @@
 
 use crate::backend::{Backend, ModelBuilder};
 use crate::config::ConfigSpec;
-use crate::diagnostics::{TraceEvent, TraceLevel, TraceSink};
+use crate::diagnostics::{TraceEvent, TraceLevel, TraceSink, TraceSinkExt};
 use crate::error::{AphelionError, AphelionResult};
 use crate::graph::BuildGraph;
 use std::collections::HashSet;
@@ -224,6 +224,73 @@ impl BuildPipeline {
             skip_stages: HashSet::new(),
             on_progress: None,
         }
+    }
+
+    /// Creates a standard pipeline with validation and hashing stages.
+    ///
+    /// The standard pipeline provides a sensible default for most use cases:
+    /// - Validates the build graph structure
+    /// - Computes and traces the deterministic graph hash
+    ///
+    /// This is the recommended pipeline for general model building.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::standard();
+    /// // Use pipeline for building...
+    /// ```
+    pub fn standard() -> Self {
+        Self::new()
+            .with_stage(Box::new(ValidationStage))
+            .with_stage(Box::new(HashingStage))
+    }
+
+    /// Creates a training pipeline optimized for model training workflows.
+    ///
+    /// The training pipeline extends the standard pipeline with:
+    /// - All standard stages (validation + hashing)
+    /// - Pre-hook that logs the start of training
+    ///
+    /// This pipeline is useful for workflows that need to distinguish
+    /// between training and inference execution phases.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::for_training();
+    /// // Use pipeline for training...
+    /// ```
+    pub fn for_training() -> Self {
+        Self::standard().with_pre_hook(|ctx| {
+            ctx.trace.info("pipeline.training", "Starting training pipeline");
+            Ok(())
+        })
+    }
+
+    /// Creates an inference pipeline optimized for deployment and inference.
+    ///
+    /// The inference pipeline is minimal for speed:
+    /// - Only computes and traces the graph hash
+    /// - Skips expensive validation for known-good models
+    ///
+    /// This pipeline is ideal for production deployments where the model
+    /// has already been validated during training.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::for_inference();
+    /// // Use pipeline for inference...
+    /// ```
+    pub fn for_inference() -> Self {
+        Self::new().with_stage(Box::new(HashingStage))
     }
 
     /// Adds a stage to the pipeline.
@@ -972,5 +1039,140 @@ mod tests {
 
         assert_eq!(ctx_new.backend.name(), ctx_literal.backend.name());
         assert_eq!(ctx_new.backend.device(), ctx_literal.backend.device());
+    }
+
+    #[test]
+    fn test_standard_pipeline_has_validation_and_hashing() {
+        let pipeline = BuildPipeline::standard();
+
+        // Standard pipeline should have exactly 2 stages
+        assert_eq!(pipeline.stages.len(), 2);
+
+        // Verify stage names
+        let stage_names: Vec<&str> = pipeline.stages.iter().map(|s| s.name()).collect();
+        assert_eq!(stage_names, vec!["validation", "hashing"]);
+    }
+
+    #[test]
+    fn test_training_pipeline_logs_start() {
+        let trace_sink = MockTraceSink::new();
+        let ctx = BuildContext {
+            backend: &MockBackend,
+            trace: &trace_sink,
+        };
+
+        let mut graph = BuildGraph::default();
+        let config = ModelConfig::new("test", "1.0");
+        graph.add_node("test_node", config);
+
+        let pipeline = BuildPipeline::for_training();
+
+        // Execute the pipeline to trigger the pre-hook
+        let _result = pipeline.execute(&ctx, graph);
+
+        let events = trace_sink.get_events();
+
+        // Should have events from pre-hook and both stages
+        assert!(events.len() >= 2);
+
+        // Verify the pre-hook logged training start
+        assert!(events
+            .iter()
+            .any(|e| e.contains("pipeline.training") && e.contains("Starting training pipeline")));
+    }
+
+    #[test]
+    fn test_training_pipeline_has_standard_stages() {
+        let pipeline = BuildPipeline::for_training();
+
+        // Training pipeline should have exactly 2 stages (standard) + 1 pre-hook
+        assert_eq!(pipeline.stages.len(), 2);
+
+        let stage_names: Vec<&str> = pipeline.stages.iter().map(|s| s.name()).collect();
+        assert_eq!(stage_names, vec!["validation", "hashing"]);
+
+        // Verify it has a pre-hook
+        assert_eq!(pipeline.hooks.pre_build.len(), 1);
+    }
+
+    #[test]
+    fn test_inference_pipeline_minimal() {
+        let pipeline = BuildPipeline::for_inference();
+
+        // Inference pipeline should have only 1 stage (hashing)
+        assert_eq!(pipeline.stages.len(), 1);
+
+        // Verify it only has hashing
+        let stage_names: Vec<&str> = pipeline.stages.iter().map(|s| s.name()).collect();
+        assert_eq!(stage_names, vec!["hashing"]);
+
+        // Verify no hooks
+        assert_eq!(pipeline.hooks.pre_build.len(), 0);
+        assert_eq!(pipeline.hooks.post_build.len(), 0);
+    }
+
+    #[test]
+    fn test_inference_pipeline_execution() {
+        let trace_sink = MockTraceSink::new();
+        let ctx = BuildContext {
+            backend: &MockBackend,
+            trace: &trace_sink,
+        };
+
+        let mut graph = BuildGraph::default();
+        let config = ModelConfig::new("test", "1.0");
+        graph.add_node("test_node", config);
+
+        let pipeline = BuildPipeline::for_inference();
+
+        // Execution should succeed
+        let result = pipeline.execute(&ctx, graph);
+        assert!(result.is_ok());
+
+        let events = trace_sink.get_events();
+
+        // Should only have hashing stage event
+        assert!(events.iter().any(|e| e.contains("computed graph hash")));
+
+        // Should NOT have validation events
+        assert!(!events.iter().any(|e| e.contains("validated")));
+    }
+
+    #[test]
+    fn test_standard_pipeline_execution() {
+        let trace_sink = MockTraceSink::new();
+        let ctx = BuildContext {
+            backend: &MockBackend,
+            trace: &trace_sink,
+        };
+
+        let mut graph = BuildGraph::default();
+        let config = ModelConfig::new("test", "1.0");
+        graph.add_node("test_node", config);
+
+        let pipeline = BuildPipeline::standard();
+
+        // Execution should succeed
+        let result = pipeline.execute(&ctx, graph);
+        assert!(result.is_ok());
+
+        let events = trace_sink.get_events();
+
+        // Should have both validation and hashing events
+        assert!(events.iter().any(|e| e.contains("validated 1 nodes")));
+        assert!(events.iter().any(|e| e.contains("computed graph hash")));
+    }
+
+    #[test]
+    fn test_preset_pipelines_are_extensible() {
+        // Verify that preset pipelines can be further customized
+        let pipeline = BuildPipeline::standard()
+            .with_progress(|name, current, total| {
+                let _ = (name, current, total);
+            });
+
+        // Should be able to add more stages on top of presets
+        let extended = pipeline.with_stage(Box::new(ValidationStage));
+        assert_eq!(extended.stages.len(), 3);
     }
 }
