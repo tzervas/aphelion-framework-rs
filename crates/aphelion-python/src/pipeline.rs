@@ -112,7 +112,7 @@ impl PyBuildPipeline {
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             // Simulate async execution
             tokio::task::yield_now().await;
-            
+
             // Return processed graph
             Ok(PyBuildGraph { inner: rust_graph })
         })

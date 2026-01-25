@@ -38,7 +38,11 @@ impl PyNullBackend {
     }
 
     fn __repr__(&self) -> String {
-        format!("NullBackend(name='{}', device='{}')", self.name(), self.device())
+        format!(
+            "NullBackend(name='{}', device='{}')",
+            self.name(),
+            self.device()
+        )
     }
 }
 

@@ -118,9 +118,13 @@ impl PyModelConfigBuilder {
     }
 
     fn build(&self) -> PyResult<PyModelConfig> {
-        let name = self.name.clone()
+        let name = self
+            .name
+            .clone()
             .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("name is required"))?;
-        let version = self.version.clone()
+        let version = self
+            .version
+            .clone()
             .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("version is required"))?;
 
         let mut config = ModelConfig::new(name, version);

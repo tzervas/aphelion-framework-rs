@@ -4,6 +4,9 @@
 //! enabling Python developers to use the Aphelion AI framework with
 //! the same performance and reliability as Rust.
 
+// Allow clippy false positive with PyO3's PyResult in return types
+#![allow(clippy::useless_conversion)]
+
 use pyo3::prelude::*;
 
 mod backend;
