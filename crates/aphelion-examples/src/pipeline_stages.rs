@@ -42,8 +42,8 @@ impl PipelineStage for ValidateStructureStage {
         });
 
         if graph.node_count() == 0 {
-            return Err(aphelion_core::error::AphelionError::Validation(
-                "Graph must contain at least one node".to_string(),
+            return Err(aphelion_core::error::AphelionError::validation(
+                "Graph must contain at least one node",
             ));
         }
 
@@ -120,10 +120,8 @@ impl PipelineStage for MetadataStage {
     fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()> {
         let mut count = self.metadata_added.lock().unwrap();
         for node in &mut graph.nodes {
-            node.metadata.insert(
-                "stage".to_string(),
-                serde_json::json!("metadata"),
-            );
+            node.metadata
+                .insert("stage".to_string(), serde_json::json!("metadata"));
             *count += 1;
         }
 
@@ -151,8 +149,8 @@ pub fn run_example() -> AphelionResult<()> {
     println!("=== Pipeline Stages Example ===\n");
 
     // Create a model and graph
-    let config = ModelConfig::new("pipeline_model", "1.0.0")
-        .with_param("stage_count", serde_json::json!(4));
+    let config =
+        ModelConfig::new("pipeline_model", "1.0.0").with_param("stage_count", serde_json::json!(4));
 
     let mut graph = BuildGraph::default();
     let node1 = graph.add_node("input", config.clone());
@@ -197,7 +195,10 @@ pub fn run_example() -> AphelionResult<()> {
         // Progress callback
         .with_progress(|stage_name, current, total| {
             let percent = (current as f32 / total as f32) * 100.0;
-            println!("  [PROGRESS] {}/{} ({:.0}%) - {}", current, total, percent, stage_name);
+            println!(
+                "  [PROGRESS] {}/{} ({:.0}%) - {}",
+                current, total, percent, stage_name
+            );
         });
 
     let ctx = BuildContext {
@@ -232,7 +233,7 @@ pub fn run_example() -> AphelionResult<()> {
         .with_stage(Box::new(ValidateStructureStage))
         .with_stage(Box::new(OptimizeGraphStage))
         .with_stage(Box::new(CodegenStage))
-        .with_skip_stage("optimize_graph")  // Skip optimization stage
+        .with_skip_stage("optimize_graph") // Skip optimization stage
         .with_progress(|stage_name, current, total| {
             println!("  [PROGRESS] {}/{} - {}", current, total, stage_name);
         });

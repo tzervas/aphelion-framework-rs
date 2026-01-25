@@ -6,11 +6,21 @@
 
 use crate::backend::{Backend, ModelBuilder};
 use crate::config::ConfigSpec;
-use crate::diagnostics::{TraceEvent, TraceLevel, TraceSink};
+use crate::diagnostics::{TraceEvent, TraceLevel, TraceSink, TraceSinkExt};
 use crate::error::{AphelionError, AphelionResult};
 use crate::graph::BuildGraph;
 use std::collections::HashSet;
 use std::time::SystemTime;
+
+/// Type alias for pre-build hook functions.
+pub type PreBuildHook = Box<dyn Fn(&BuildContext) -> AphelionResult<()> + Send + Sync>;
+
+/// Type alias for post-build hook functions.
+pub type PostBuildHook =
+    Box<dyn Fn(&BuildContext, &BuildGraph) -> AphelionResult<()> + Send + Sync>;
+
+/// Type alias for progress callback functions.
+pub type ProgressCallback = Box<dyn Fn(&str, usize, usize) + Send + Sync>;
 
 /// Execution context containing backend and tracing infrastructure.
 ///
@@ -42,6 +52,21 @@ pub struct BuildContext<'a> {
     pub backend: &'a dyn Backend,
     /// The trace sink for recording events
     pub trace: &'a dyn TraceSink,
+}
+
+impl<'a> BuildContext<'a> {
+    /// Creates a new `BuildContext` with the provided backend and trace sink.
+    pub fn new(backend: &'a dyn Backend, trace: &'a dyn TraceSink) -> Self {
+        Self { backend, trace }
+    }
+
+    /// Creates a new `BuildContext` with a provided null backend for testing scenarios.
+    pub fn with_null_backend(
+        backend: &'a crate::backend::NullBackend,
+        trace: &'a dyn TraceSink,
+    ) -> Self {
+        Self { backend, trace }
+    }
 }
 
 /// Trait for composable pipeline stages.
@@ -99,6 +124,66 @@ pub trait PipelineStage: Send + Sync {
     fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()>;
 }
 
+/// Trait for composable asynchronous pipeline stages.
+///
+/// `AsyncPipelineStage` defines the interface for asynchronous stages in a build pipeline.
+/// This trait is only available when the `tokio` feature is enabled.
+///
+/// # Implementing AsyncPipelineStage
+///
+/// Types implementing `AsyncPipelineStage` must be thread-safe (`Send + Sync`) and
+/// deterministic. The async execution should have the same behavior as sync stages.
+///
+/// # Examples
+///
+/// ```ignore
+/// use aphelion_core::pipeline::{AsyncPipelineStage, BuildContext};
+/// use aphelion_core::graph::BuildGraph;
+/// use aphelion_core::error::AphelionResult;
+/// use std::pin::Pin;
+/// use std::future::Future;
+///
+/// struct AsyncLoggingStage;
+///
+/// impl AsyncPipelineStage for AsyncLoggingStage {
+///     fn name(&self) -> &str {
+///         "async_logging"
+///     }
+///
+///     fn execute_async<'a>(
+///         &'a self,
+///         ctx: &'a BuildContext<'_>,
+///         graph: &'a mut BuildGraph,
+///     ) -> Pin<Box<dyn Future<Output = AphelionResult<()>> + Send + 'a>> {
+///         Box::pin(async move {
+///             // Async implementation here
+///             Ok(())
+///         })
+///     }
+/// }
+/// ```
+#[cfg(feature = "tokio")]
+pub trait AsyncPipelineStage: Send + Sync {
+    /// Returns the name of this stage for logging and identification.
+    fn name(&self) -> &str;
+
+    /// Executes this stage asynchronously with the given context and graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The build context with backend and trace sink
+    /// * `graph` - The computation graph being built
+    ///
+    /// # Errors
+    ///
+    /// Returns `AphelionResult::Err` if the stage fails.
+    fn execute_async<'a>(
+        &'a self,
+        ctx: &'a BuildContext<'_>,
+        graph: &'a mut BuildGraph,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = AphelionResult<()>> + Send + 'a>>;
+}
+
 /// Lifecycle hooks for pipeline execution.
 ///
 /// `PipelineHooks` allows registering callbacks that execute before and after
@@ -121,20 +206,12 @@ pub trait PipelineStage: Send + Sync {
 /// let mut hooks = PipelineHooks::default();
 /// // Can add hooks here
 /// ```
+#[derive(Default)]
 pub struct PipelineHooks {
     /// Callbacks to execute before any pipeline stages
-    pub pre_build: Vec<Box<dyn Fn(&BuildContext) -> AphelionResult<()> + Send + Sync>>,
+    pub pre_build: Vec<PreBuildHook>,
     /// Callbacks to execute after all pipeline stages
-    pub post_build: Vec<Box<dyn Fn(&BuildContext, &BuildGraph) -> AphelionResult<()> + Send + Sync>>,
-}
-
-impl Default for PipelineHooks {
-    fn default() -> Self {
-        Self {
-            pre_build: Vec::new(),
-            post_build: Vec::new(),
-        }
-    }
+    pub post_build: Vec<PostBuildHook>,
 }
 
 /// An extensible build pipeline for composing model construction stages.
@@ -174,9 +251,11 @@ impl Default for PipelineHooks {
 /// ```
 pub struct BuildPipeline {
     stages: Vec<Box<dyn PipelineStage>>,
+    #[cfg(feature = "tokio")]
+    async_stages: Vec<Box<dyn AsyncPipelineStage>>,
     hooks: PipelineHooks,
     skip_stages: HashSet<String>,
-    on_progress: Option<Box<dyn Fn(&str, usize, usize) + Send + Sync>>,
+    on_progress: Option<ProgressCallback>,
 }
 
 impl Default for BuildPipeline {
@@ -202,10 +281,80 @@ impl BuildPipeline {
     pub fn new() -> Self {
         Self {
             stages: Vec::new(),
+            #[cfg(feature = "tokio")]
+            async_stages: Vec::new(),
             hooks: PipelineHooks::default(),
             skip_stages: HashSet::new(),
             on_progress: None,
         }
+    }
+
+    /// Creates a standard pipeline with validation and hashing stages.
+    ///
+    /// The standard pipeline provides a sensible default for most use cases:
+    /// - Validates the build graph structure
+    /// - Computes and traces the deterministic graph hash
+    ///
+    /// This is the recommended pipeline for general model building.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::standard();
+    /// // Use pipeline for building...
+    /// ```
+    pub fn standard() -> Self {
+        Self::new()
+            .with_stage(Box::new(ValidationStage))
+            .with_stage(Box::new(HashingStage))
+    }
+
+    /// Creates a training pipeline optimized for model training workflows.
+    ///
+    /// The training pipeline extends the standard pipeline with:
+    /// - All standard stages (validation + hashing)
+    /// - Pre-hook that logs the start of training
+    ///
+    /// This pipeline is useful for workflows that need to distinguish
+    /// between training and inference execution phases.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::for_training();
+    /// // Use pipeline for training...
+    /// ```
+    pub fn for_training() -> Self {
+        Self::standard().with_pre_hook(|ctx| {
+            ctx.trace
+                .info("pipeline.training", "Starting training pipeline");
+            Ok(())
+        })
+    }
+
+    /// Creates an inference pipeline optimized for deployment and inference.
+    ///
+    /// The inference pipeline is minimal for speed:
+    /// - Only computes and traces the graph hash
+    /// - Skips expensive validation for known-good models
+    ///
+    /// This pipeline is ideal for production deployments where the model
+    /// has already been validated during training.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::for_inference();
+    /// // Use pipeline for inference...
+    /// ```
+    pub fn for_inference() -> Self {
+        Self::new().with_stage(Box::new(HashingStage))
     }
 
     /// Adds a stage to the pipeline.
@@ -226,6 +375,29 @@ impl BuildPipeline {
     /// ```
     pub fn with_stage(mut self, stage: Box<dyn PipelineStage>) -> Self {
         self.stages.push(stage);
+        self
+    }
+
+    /// Adds an async stage to the pipeline.
+    ///
+    /// Async stages are only available when the `tokio` feature is enabled.
+    /// They are executed in the order they are added.
+    ///
+    /// # Arguments
+    ///
+    /// * `stage` - The async stage to add
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use aphelion_core::pipeline::BuildPipeline;
+    ///
+    /// let pipeline = BuildPipeline::new()
+    ///     .with_async_stage(Box::new(MyAsyncStage));
+    /// ```
+    #[cfg(feature = "tokio")]
+    pub fn with_async_stage(mut self, stage: Box<dyn AsyncPipelineStage>) -> Self {
+        self.async_stages.push(stage);
         self
     }
 
@@ -353,7 +525,11 @@ impl BuildPipeline {
             // Skip stage if it's in the skip list
             if self.skip_stages.contains(stage_name) {
                 if let Some(ref progress) = self.on_progress {
-                    progress(&format!("{} (skipped)", stage_name), index + 1, total_stages);
+                    progress(
+                        &format!("{} (skipped)", stage_name),
+                        index + 1,
+                        total_stages,
+                    );
                 }
                 continue;
             }
@@ -365,6 +541,90 @@ impl BuildPipeline {
 
             // Execute stage
             stage.execute(ctx, &mut graph)?;
+        }
+
+        // Execute post-build hooks
+        for hook in &self.hooks.post_build {
+            hook(ctx, &graph)?;
+        }
+
+        Ok(graph)
+    }
+
+    /// Executes the pipeline asynchronously with all configured async stages.
+    ///
+    /// This method is only available when the `tokio` feature is enabled.
+    /// Executes pre-build hooks, then all async stages in order (skipping as configured),
+    /// then post-build hooks. Returns the final graph if successful.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The build context
+    /// * `graph` - The initial computation graph
+    ///
+    /// # Returns
+    ///
+    /// The final graph after all stages, or an error if any stage fails
+    ///
+    /// # Errors
+    ///
+    /// Returns `AphelionResult::Err` if any hook or stage returns an error.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use aphelion_core::pipeline::{BuildPipeline, BuildContext};
+    /// use aphelion_core::graph::BuildGraph;
+    /// use aphelion_core::backend::NullBackend;
+    /// use aphelion_core::diagnostics::InMemoryTraceSink;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let pipeline = BuildPipeline::new();
+    ///     let backend = NullBackend::cpu();
+    ///     let trace = InMemoryTraceSink::new();
+    ///     let ctx = BuildContext { backend: &backend, trace: &trace };
+    ///     let graph = BuildGraph::default();
+    ///
+    ///     let result = pipeline.execute_async(&ctx, graph).await;
+    ///     assert!(result.is_ok());
+    /// }
+    /// ```
+    #[cfg(feature = "tokio")]
+    pub async fn execute_async(
+        &self,
+        ctx: &BuildContext<'_>,
+        mut graph: BuildGraph,
+    ) -> AphelionResult<BuildGraph> {
+        // Execute pre-build hooks
+        for hook in &self.hooks.pre_build {
+            hook(ctx)?;
+        }
+
+        // Execute async stages
+        let total_stages = self.async_stages.len();
+        for (index, stage) in self.async_stages.iter().enumerate() {
+            let stage_name = stage.name();
+
+            // Skip stage if it's in the skip list
+            if self.skip_stages.contains(stage_name) {
+                if let Some(ref progress) = self.on_progress {
+                    progress(
+                        &format!("{} (skipped)", stage_name),
+                        index + 1,
+                        total_stages,
+                    );
+                }
+                continue;
+            }
+
+            // Report progress
+            if let Some(ref progress) = self.on_progress {
+                progress(stage_name, index + 1, total_stages);
+            }
+
+            // Execute async stage
+            stage.execute_async(ctx, &mut graph).await?;
         }
 
         // Execute post-build hooks
@@ -438,23 +698,16 @@ impl BuildPipeline {
     /// ```ignore
     /// let graph = BuildPipeline::build_with_validation(&my_model, ctx)?;
     /// ```
-    pub fn build_with_validation<M>(
-        model: &M,
-        ctx: BuildContext<'_>,
-    ) -> AphelionResult<BuildGraph>
+    pub fn build_with_validation<M>(model: &M, ctx: BuildContext<'_>) -> AphelionResult<BuildGraph>
     where
         M: ModelBuilder<Output = BuildGraph> + ConfigSpec,
     {
         let config = model.config();
         if config.name.trim().is_empty() {
-            return Err(AphelionError::InvalidConfig(
-                "name cannot be empty".to_string(),
-            ));
+            return Err(AphelionError::config_error("name cannot be empty"));
         }
         if config.version.trim().is_empty() {
-            return Err(AphelionError::InvalidConfig(
-                "version cannot be empty".to_string(),
-            ));
+            return Err(AphelionError::config_error("version cannot be empty"));
         }
 
         ctx.trace.record(TraceEvent {
@@ -506,8 +759,8 @@ impl PipelineStage for ValidationStage {
 
     fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()> {
         if graph.nodes.is_empty() {
-            return Err(AphelionError::Validation(
-                "graph must contain at least one node".to_string(),
+            return Err(AphelionError::validation(
+                "graph must contain at least one node",
             ));
         }
 
@@ -573,6 +826,61 @@ impl PipelineStage for HashingStage {
         });
 
         Ok(())
+    }
+}
+
+/// Async implementation for ValidationStage.
+///
+/// This allows ValidationStage to be used in async pipelines when the `tokio` feature is enabled.
+///
+/// # Note
+///
+/// This implementation delegates to the synchronous `execute()` method without yielding.
+/// For fast operations like validation, this is acceptable. For CPU-intensive stages,
+/// consider using `tokio::task::spawn_blocking()` in your custom implementations.
+#[cfg(feature = "tokio")]
+impl AsyncPipelineStage for ValidationStage {
+    fn name(&self) -> &str {
+        "validation"
+    }
+
+    fn execute_async<'a>(
+        &'a self,
+        ctx: &'a BuildContext<'_>,
+        graph: &'a mut BuildGraph,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = AphelionResult<()>> + Send + 'a>> {
+        Box::pin(async move {
+            // Delegate to the synchronous implementation
+            // Note: This does not yield to the async runtime - acceptable for fast operations
+            self.execute(ctx, graph)
+        })
+    }
+}
+
+/// Async implementation for HashingStage.
+///
+/// This allows HashingStage to be used in async pipelines when the `tokio` feature is enabled.
+///
+/// # Note
+///
+/// This implementation delegates to the synchronous `execute()` method without yielding.
+/// For fast operations like hashing, this is acceptable. For CPU-intensive stages,
+/// consider using `tokio::task::spawn_blocking()` in your custom implementations.
+#[cfg(feature = "tokio")]
+impl AsyncPipelineStage for HashingStage {
+    fn name(&self) -> &str {
+        "hashing"
+    }
+
+    fn execute_async<'a>(
+        &'a self,
+        ctx: &'a BuildContext<'_>,
+        graph: &'a mut BuildGraph,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = AphelionResult<()>> + Send + 'a>> {
+        Box::pin(async move {
+            // Delegate to the synchronous implementation
+            self.execute(ctx, graph)
+        })
     }
 }
 
@@ -756,8 +1064,14 @@ mod tests {
         let progress_calls = Arc::new(Mutex::new(Vec::new()));
         let progress_calls_clone = Arc::clone(&progress_calls);
 
-        let stage1 = Box::new(RecordingStage::new("stage1", Arc::new(Mutex::new(Vec::new()))));
-        let stage2 = Box::new(RecordingStage::new("stage2", Arc::new(Mutex::new(Vec::new()))));
+        let stage1 = Box::new(RecordingStage::new(
+            "stage1",
+            Arc::new(Mutex::new(Vec::new())),
+        ));
+        let stage2 = Box::new(RecordingStage::new(
+            "stage2",
+            Arc::new(Mutex::new(Vec::new())),
+        ));
 
         let pipeline = BuildPipeline::new()
             .with_stage(stage1)
@@ -789,9 +1103,18 @@ mod tests {
         let progress_calls = Arc::new(Mutex::new(Vec::new()));
         let progress_calls_clone = Arc::clone(&progress_calls);
 
-        let stage1 = Box::new(RecordingStage::new("stage1", Arc::new(Mutex::new(Vec::new()))));
-        let stage2 = Box::new(RecordingStage::new("stage2", Arc::new(Mutex::new(Vec::new()))));
-        let stage3 = Box::new(RecordingStage::new("stage3", Arc::new(Mutex::new(Vec::new()))));
+        let stage1 = Box::new(RecordingStage::new(
+            "stage1",
+            Arc::new(Mutex::new(Vec::new())),
+        ));
+        let stage2 = Box::new(RecordingStage::new(
+            "stage2",
+            Arc::new(Mutex::new(Vec::new())),
+        ));
+        let stage3 = Box::new(RecordingStage::new(
+            "stage3",
+            Arc::new(Mutex::new(Vec::new())),
+        ));
 
         let pipeline = BuildPipeline::new()
             .with_stage(stage1)
@@ -907,9 +1230,8 @@ mod tests {
 
     #[test]
     fn test_hook_error_propagation() {
-        let pipeline = BuildPipeline::new().with_pre_hook(|_ctx| {
-            Err(AphelionError::Build("test error".to_string()))
-        });
+        let pipeline =
+            BuildPipeline::new().with_pre_hook(|_ctx| Err(AphelionError::validation("test error")));
 
         let trace_sink = MockTraceSink::new();
         let ctx = BuildContext {
@@ -921,5 +1243,178 @@ mod tests {
         let result = pipeline.execute(&ctx, graph);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_context_new() {
+        let backend = MockBackend;
+        let trace_sink = MockTraceSink::new();
+
+        let ctx = BuildContext::new(&backend, &trace_sink);
+
+        assert_eq!(ctx.backend.name(), "mock");
+        assert_eq!(ctx.backend.device(), "mock_device");
+        assert!(ctx.backend.is_available());
+    }
+
+    #[test]
+    fn test_build_context_with_null_backend() {
+        let backend = crate::backend::NullBackend::cpu();
+        let trace_sink = MockTraceSink::new();
+
+        let ctx = BuildContext::with_null_backend(&backend, &trace_sink);
+
+        assert_eq!(ctx.backend.name(), "null");
+        assert_eq!(ctx.backend.device(), "cpu");
+        assert!(ctx.backend.is_available());
+    }
+
+    #[test]
+    fn test_build_context_new_vs_struct_literal() {
+        let backend = MockBackend;
+        let trace_sink = MockTraceSink::new();
+
+        let ctx_new = BuildContext::new(&backend, &trace_sink);
+        let ctx_literal = BuildContext {
+            backend: &backend,
+            trace: &trace_sink,
+        };
+
+        assert_eq!(ctx_new.backend.name(), ctx_literal.backend.name());
+        assert_eq!(ctx_new.backend.device(), ctx_literal.backend.device());
+    }
+
+    #[test]
+    fn test_standard_pipeline_has_validation_and_hashing() {
+        let pipeline = BuildPipeline::standard();
+
+        // Standard pipeline should have exactly 2 stages
+        assert_eq!(pipeline.stages.len(), 2);
+
+        // Verify stage names
+        let stage_names: Vec<&str> = pipeline.stages.iter().map(|s| s.name()).collect();
+        assert_eq!(stage_names, vec!["validation", "hashing"]);
+    }
+
+    #[test]
+    fn test_training_pipeline_logs_start() {
+        let trace_sink = MockTraceSink::new();
+        let ctx = BuildContext {
+            backend: &MockBackend,
+            trace: &trace_sink,
+        };
+
+        let mut graph = BuildGraph::default();
+        let config = ModelConfig::new("test", "1.0");
+        graph.add_node("test_node", config);
+
+        let pipeline = BuildPipeline::for_training();
+
+        // Execute the pipeline to trigger the pre-hook
+        let _result = pipeline.execute(&ctx, graph);
+
+        let events = trace_sink.get_events();
+
+        // Should have events from pre-hook and both stages
+        assert!(events.len() >= 2);
+
+        // Verify the pre-hook logged training start
+        assert!(events
+            .iter()
+            .any(|e| e.contains("pipeline.training") && e.contains("Starting training pipeline")));
+    }
+
+    #[test]
+    fn test_training_pipeline_has_standard_stages() {
+        let pipeline = BuildPipeline::for_training();
+
+        // Training pipeline should have exactly 2 stages (standard) + 1 pre-hook
+        assert_eq!(pipeline.stages.len(), 2);
+
+        let stage_names: Vec<&str> = pipeline.stages.iter().map(|s| s.name()).collect();
+        assert_eq!(stage_names, vec!["validation", "hashing"]);
+
+        // Verify it has a pre-hook
+        assert_eq!(pipeline.hooks.pre_build.len(), 1);
+    }
+
+    #[test]
+    fn test_inference_pipeline_minimal() {
+        let pipeline = BuildPipeline::for_inference();
+
+        // Inference pipeline should have only 1 stage (hashing)
+        assert_eq!(pipeline.stages.len(), 1);
+
+        // Verify it only has hashing
+        let stage_names: Vec<&str> = pipeline.stages.iter().map(|s| s.name()).collect();
+        assert_eq!(stage_names, vec!["hashing"]);
+
+        // Verify no hooks
+        assert_eq!(pipeline.hooks.pre_build.len(), 0);
+        assert_eq!(pipeline.hooks.post_build.len(), 0);
+    }
+
+    #[test]
+    fn test_inference_pipeline_execution() {
+        let trace_sink = MockTraceSink::new();
+        let ctx = BuildContext {
+            backend: &MockBackend,
+            trace: &trace_sink,
+        };
+
+        let mut graph = BuildGraph::default();
+        let config = ModelConfig::new("test", "1.0");
+        graph.add_node("test_node", config);
+
+        let pipeline = BuildPipeline::for_inference();
+
+        // Execution should succeed
+        let result = pipeline.execute(&ctx, graph);
+        assert!(result.is_ok());
+
+        let events = trace_sink.get_events();
+
+        // Should only have hashing stage event
+        assert!(events.iter().any(|e| e.contains("computed graph hash")));
+
+        // Should NOT have validation events
+        assert!(!events.iter().any(|e| e.contains("validated")));
+    }
+
+    #[test]
+    fn test_standard_pipeline_execution() {
+        let trace_sink = MockTraceSink::new();
+        let ctx = BuildContext {
+            backend: &MockBackend,
+            trace: &trace_sink,
+        };
+
+        let mut graph = BuildGraph::default();
+        let config = ModelConfig::new("test", "1.0");
+        graph.add_node("test_node", config);
+
+        let pipeline = BuildPipeline::standard();
+
+        // Execution should succeed
+        let result = pipeline.execute(&ctx, graph);
+        assert!(result.is_ok());
+
+        let events = trace_sink.get_events();
+
+        // Should have both validation and hashing events
+        assert!(events.iter().any(|e| e.contains("validated 1 nodes")));
+        assert!(events.iter().any(|e| e.contains("computed graph hash")));
+    }
+
+    #[test]
+    fn test_preset_pipelines_are_extensible() {
+        // Verify that preset pipelines can be further customized
+        let pipeline = BuildPipeline::standard().with_progress(|name, current, total| {
+            let _ = (name, current, total);
+        });
+
+        // Should be able to add more stages on top of presets
+        let extended = pipeline.with_stage(Box::new(ValidationStage));
+        assert_eq!(extended.stages.len(), 3);
     }
 }

@@ -26,6 +26,12 @@ pub struct ToyModel {
     pub config: ModelConfig,
 }
 
+impl Default for ToyModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ToyModel {
     pub fn new() -> Self {
         Self {
@@ -40,7 +46,11 @@ impl ToyModel {
     pub fn build_graph(&self, backend: &dyn Backend, trace: &dyn TraceSink) -> BuildGraph {
         trace.record(TraceEvent {
             id: "toy_model.init".to_string(),
-            message: format!("building with backend={} device={}", backend.name(), backend.device()),
+            message: format!(
+                "building with backend={} device={}",
+                backend.name(),
+                backend.device()
+            ),
             timestamp: SystemTime::now(),
             level: TraceLevel::Info,
             span_id: None,

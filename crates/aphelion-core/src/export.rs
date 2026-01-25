@@ -164,13 +164,13 @@ impl JsonExporter {
         match self.events.lock() {
             Ok(guard) => {
                 let serializable: Vec<SerializableTraceEvent> =
-                    guard.iter().map(|e| SerializableTraceEvent::from(e)).collect();
+                    guard.iter().map(SerializableTraceEvent::from).collect();
                 serde_json::to_string_pretty(&serializable).unwrap_or_else(|_| "[]".to_string())
             }
             Err(poisoned) => {
                 let guard = poisoned.into_inner();
                 let serializable: Vec<SerializableTraceEvent> =
-                    guard.iter().map(|e| SerializableTraceEvent::from(e)).collect();
+                    guard.iter().map(SerializableTraceEvent::from).collect();
                 serde_json::to_string_pretty(&serializable).unwrap_or_else(|_| "[]".to_string())
             }
         }

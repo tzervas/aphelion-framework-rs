@@ -11,9 +11,9 @@
 use aphelion_core::backend::NullBackend;
 use aphelion_core::config::ModelConfig;
 use aphelion_core::diagnostics::{InMemoryTraceSink, TraceEvent, TraceLevel};
+use aphelion_core::error::AphelionResult;
 use aphelion_core::graph::BuildGraph;
 use aphelion_core::pipeline::{BuildContext, BuildPipeline, PipelineStage};
-use aphelion_core::error::AphelionResult;
 use std::time::SystemTime;
 
 /// A simple custom pipeline stage that logs model information.
@@ -24,11 +24,7 @@ impl PipelineStage for ModelInfoStage {
         "model_info"
     }
 
-    fn execute(
-        &self,
-        ctx: &BuildContext,
-        graph: &mut BuildGraph,
-    ) -> AphelionResult<()> {
+    fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()> {
         ctx.trace.record(TraceEvent {
             id: "stage.model_info".to_string(),
             message: format!(
@@ -103,16 +99,21 @@ pub fn run_example() -> AphelionResult<()> {
     let events = trace_sink.events();
     println!("\nCollected {} trace events:", events.len());
     for event in &events {
-        println!("  [{}] {}: {}",
-            if event.level == TraceLevel::Info { "INFO" } else { "DEBUG" },
+        println!(
+            "  [{}] {}: {}",
+            if event.level == TraceLevel::Info {
+                "INFO"
+            } else {
+                "DEBUG"
+            },
             event.id,
             event.message
         );
     }
 
     // Step 6: Export traces to JSON
-    let trace_json = serde_json::to_string_pretty(&events)
-        .unwrap_or_else(|_| "Failed to serialize".to_string());
+    let trace_json =
+        serde_json::to_string_pretty(&events).unwrap_or_else(|_| "Failed to serialize".to_string());
     println!("\nTrace JSON export:\n{}\n", trace_json);
 
     Ok(())
