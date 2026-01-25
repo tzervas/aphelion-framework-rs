@@ -41,66 +41,23 @@ from .aphelion import (
     BuildGraph,
     
     # Backend
-    MemoryInfo,
-    DeviceCapabilities,
     NullBackend,
     
     # Diagnostics
     TraceLevel,
     TraceEvent,
     InMemoryTraceSink,
-    TraceFilter,
-    MultiSink,
     
     # Pipeline
     BuildContext,
     BuildPipeline,
-    ValidationStage,
-    HashingStage,
     
     # Validation
     ValidationError,
     NameValidator,
     VersionValidator,
     CompositeValidator,
-    
-    # Export
-    SerializableTraceEvent,
-    JsonExporter,
-    
-    # Exceptions
-    AphelionException,
-    ConfigError,
-    BackendError,
-    BuildError,
-    SerializationError,
-    IoError,
-    GraphError,
 )
-
-# Conditionally import feature-gated types
-if HAS_BURN:
-    from .aphelion import (
-        BurnDevice,
-        BurnBackendConfig,
-        BurnBackend,
-    )
-
-if HAS_CUBECL:
-    from .aphelion import (
-        CubeclDevice,
-        CubeclBackendConfig,
-        CubeclBackend,
-    )
-
-if HAS_TRITTER_ACCEL:
-    from .aphelion import (
-        TriterDevice,
-        AccelerationMode,
-        TrainingConfig,
-        InferenceConfig,
-        TriterAccelBackend,
-    )
 
 __all__ = [
     # Version
@@ -122,39 +79,20 @@ __all__ = [
     "BuildGraph",
     
     # Backend
-    "MemoryInfo",
-    "DeviceCapabilities",
     "NullBackend",
     
     # Diagnostics
     "TraceLevel",
     "TraceEvent",
     "InMemoryTraceSink",
-    "TraceFilter",
-    "MultiSink",
     
     # Pipeline
     "BuildContext",
     "BuildPipeline",
-    "ValidationStage",
-    "HashingStage",
     
     # Validation
     "ValidationError",
     "NameValidator",
     "VersionValidator",
     "CompositeValidator",
-    
-    # Export
-    "SerializableTraceEvent",
-    "JsonExporter",
-    
-    # Exceptions
-    "AphelionException",
-    "ConfigError",
-    "BackendError",
-    "BuildError",
-    "SerializationError",
-    "IoError",
-    "GraphError",
 ]

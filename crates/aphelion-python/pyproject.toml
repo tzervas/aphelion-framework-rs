@@ -32,9 +32,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/aphelion-framework-rs"
-Repository = "https://github.com/aphelion-framework-rs"
-Documentation = "https://docs.rs/aphelion-core"
+Homepage = "https://github.com/tzervas/aphelion-framework-rs"
+Repository = "https://github.com/tzervas/aphelion-framework-rs"
+Documentation = "https://github.com/tzervas/aphelion-framework-rs#readme"
+Issues = "https://github.com/tzervas/aphelion-framework-rs/issues"
 
 [project.optional-dependencies]
 dev = [

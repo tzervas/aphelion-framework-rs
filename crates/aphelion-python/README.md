@@ -1,6 +1,6 @@
 # aphelion-python
 
-Python bindings for the [Aphelion AI Framework](https://github.com/aphelion-framework-rs).
+Python bindings for the [Aphelion AI Framework](https://github.com/tzervas/aphelion-framework-rs).
 
 ## Installation
 
@@ -82,11 +82,11 @@ asyncio.run(main())
 
 ### Backend
 
-- `Backend` - Abstract backend protocol
-- `NullBackend` - CPU-only reference backend
-- `BurnBackend` - Burn framework backend (requires `burn` feature)
-- `CubeclBackend` - CubeCL backend (requires `cubecl` feature)
-- `TriterAccelBackend` - Hardware acceleration (requires `tritter-accel` feature)
+- `NullBackend` - CPU-only reference backend for testing
+
+> **Note:** Additional backends (Burn, CubeCL, Tritter-Accel) will be available
+> in future releases. Check `HAS_BURN`, `HAS_CUBECL`, `HAS_TRITTER_ACCEL`
+> feature flags at runtime.
 
 ### Pipeline
 
@@ -99,7 +99,6 @@ asyncio.run(main())
 - `TraceLevel` - Log levels (Debug, Info, Warn, Error)
 - `TraceEvent` - Structured trace event
 - `InMemoryTraceSink` - Collects events in memory
-- `MultiSink` - Fan-out to multiple sinks
 
 ### Validation
 
@@ -107,6 +106,15 @@ asyncio.run(main())
 - `NameValidator` - Validates model names
 - `VersionValidator` - Validates semver versions
 - `CompositeValidator` - Combines multiple validators
+
+### Feature Flags
+
+Python constants to check available backends at runtime:
+
+- `HAS_BURN` - Whether Burn backend is available
+- `HAS_CUBECL` - Whether CubeCL backend is available
+- `HAS_RUST_AI_CORE` - Whether rust-ai-core is available
+- `HAS_TRITTER_ACCEL` - Whether Tritter hardware acceleration is available
 
 ## License
 
