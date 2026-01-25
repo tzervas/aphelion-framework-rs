@@ -9,7 +9,9 @@ repository = { workspace = true }
 [features]
 default = []
 burn = ["aphelion-core/burn"]
+tokio = ["aphelion-core/tokio", "dep:tokio"]
 
 [dependencies]
 aphelion-core = { path = "../aphelion-core" }
 serde_json = { workspace = true }
+tokio = { workspace = true, optional = true }

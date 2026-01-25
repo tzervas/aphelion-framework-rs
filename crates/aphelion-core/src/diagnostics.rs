@@ -119,6 +119,103 @@ pub trait TraceSink: Send + Sync {
     fn record(&self, event: TraceEvent);
 }
 
+/// Extension trait providing convenience methods for recording trace events.
+///
+/// `TraceSinkExt` reduces boilerplate when recording diagnostic events by automatically
+/// setting timestamp, and defaulting optional fields (span_id, trace_id). It provides
+/// convenience methods for each severity level: `debug()`, `info()`, `warn()`, and `error()`.
+///
+/// # Examples
+///
+/// ```
+/// use aphelion_core::diagnostics::{TraceSink, TraceSinkExt, InMemoryTraceSink};
+///
+/// let sink = InMemoryTraceSink::new();
+///
+/// // Simple one-liner recording
+/// sink.info("stage.start", "Starting optimization stage");
+/// sink.warn("config.deprecated", "Field 'legacy_mode' is deprecated");
+/// sink.error("build.failed", "Failed to compile graph");
+///
+/// let events = sink.events();
+/// assert_eq!(events.len(), 3);
+/// assert_eq!(events[0].id, "stage.start");
+/// assert_eq!(events[1].id, "config.deprecated");
+/// assert_eq!(events[2].id, "build.failed");
+/// ```
+pub trait TraceSinkExt: TraceSink {
+    /// Records a debug-level event with auto-generated timestamp.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Event identifier (will be converted to String)
+    /// * `message` - Event description (will be converted to String)
+    fn debug(&self, id: &str, message: impl Into<String>) {
+        self.record(TraceEvent {
+            id: id.to_string(),
+            message: message.into(),
+            timestamp: SystemTime::now(),
+            level: TraceLevel::Debug,
+            span_id: None,
+            trace_id: None,
+        });
+    }
+
+    /// Records an info-level event with auto-generated timestamp.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Event identifier (will be converted to String)
+    /// * `message` - Event description (will be converted to String)
+    fn info(&self, id: &str, message: impl Into<String>) {
+        self.record(TraceEvent {
+            id: id.to_string(),
+            message: message.into(),
+            timestamp: SystemTime::now(),
+            level: TraceLevel::Info,
+            span_id: None,
+            trace_id: None,
+        });
+    }
+
+    /// Records a warn-level event with auto-generated timestamp.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Event identifier (will be converted to String)
+    /// * `message` - Event description (will be converted to String)
+    fn warn(&self, id: &str, message: impl Into<String>) {
+        self.record(TraceEvent {
+            id: id.to_string(),
+            message: message.into(),
+            timestamp: SystemTime::now(),
+            level: TraceLevel::Warn,
+            span_id: None,
+            trace_id: None,
+        });
+    }
+
+    /// Records an error-level event with auto-generated timestamp.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Event identifier (will be converted to String)
+    /// * `message` - Event description (will be converted to String)
+    fn error(&self, id: &str, message: impl Into<String>) {
+        self.record(TraceEvent {
+            id: id.to_string(),
+            message: message.into(),
+            timestamp: SystemTime::now(),
+            level: TraceLevel::Error,
+            span_id: None,
+            trace_id: None,
+        });
+    }
+}
+
+/// Blanket implementation of TraceSinkExt for all types implementing TraceSink.
+impl<T: TraceSink + ?Sized> TraceSinkExt for T {}
+
 /// An in-memory trace sink that stores all recorded events.
 ///
 /// `InMemoryTraceSink` is useful for testing, debugging, and analysis of build processes.
@@ -553,5 +650,126 @@ mod tests {
         assert_eq!(in_memory.events()[0].id, "warn");
 
         assert_eq!(in_memory2.events().len(), 2);
+    }
+
+    #[test]
+    fn test_trace_sink_ext_info_helper() {
+        let sink = InMemoryTraceSink::new();
+
+        // One-liner usage without boilerplate
+        sink.info("stage.start", "Starting build");
+
+        let events = sink.events();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].id, "stage.start");
+        assert_eq!(events[0].message, "Starting build");
+        assert_eq!(events[0].level, TraceLevel::Info);
+        assert_eq!(events[0].span_id, None);
+        assert_eq!(events[0].trace_id, None);
+    }
+
+    #[test]
+    fn test_trace_sink_ext_debug_helper() {
+        let sink = InMemoryTraceSink::new();
+
+        sink.debug("optimizer.verbose", "Iteration 42");
+
+        let events = sink.events();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].id, "optimizer.verbose");
+        assert_eq!(events[0].message, "Iteration 42");
+        assert_eq!(events[0].level, TraceLevel::Debug);
+    }
+
+    #[test]
+    fn test_trace_sink_ext_warn_helper() {
+        let sink = InMemoryTraceSink::new();
+
+        sink.warn("config.deprecated", "Using legacy mode");
+
+        let events = sink.events();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].id, "config.deprecated");
+        assert_eq!(events[0].message, "Using legacy mode");
+        assert_eq!(events[0].level, TraceLevel::Warn);
+    }
+
+    #[test]
+    fn test_trace_sink_ext_error_helper() {
+        let sink = InMemoryTraceSink::new();
+
+        sink.error("build.failed", "Graph compilation error");
+
+        let events = sink.events();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].id, "build.failed");
+        assert_eq!(events[0].message, "Graph compilation error");
+        assert_eq!(events[0].level, TraceLevel::Error);
+    }
+
+    #[test]
+    fn test_trace_sink_ext_multiple_helpers() {
+        let sink = InMemoryTraceSink::new();
+
+        sink.debug("app.start", "Debug message");
+        sink.info("app.stage1", "Info message");
+        sink.warn("app.stage2", "Warn message");
+        sink.error("app.stage3", "Error message");
+
+        let events = sink.events();
+        assert_eq!(events.len(), 4);
+        assert_eq!(events[0].level, TraceLevel::Debug);
+        assert_eq!(events[1].level, TraceLevel::Info);
+        assert_eq!(events[2].level, TraceLevel::Warn);
+        assert_eq!(events[3].level, TraceLevel::Error);
+    }
+
+    #[test]
+    fn test_trace_sink_ext_with_string_conversion() {
+        let sink = InMemoryTraceSink::new();
+
+        // Test with String conversion via Into<String>
+        let field_name = "deprecated_field";
+        sink.warn(
+            "config.field",
+            format!("Field '{}' is deprecated", field_name),
+        );
+
+        let events = sink.events();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].message, "Field 'deprecated_field' is deprecated");
+    }
+
+    #[test]
+    fn test_trace_sink_ext_with_filter() {
+        let in_memory = Arc::new(InMemoryTraceSink::new());
+        let filter = Arc::new(TraceFilter::new(TraceLevel::Warn, in_memory.clone()));
+
+        // Debug and info should be filtered out
+        filter.debug("test.debug", "Debug message");
+        filter.info("test.info", "Info message");
+
+        // Warn and error should pass through
+        filter.warn("test.warn", "Warn message");
+        filter.error("test.error", "Error message");
+
+        let recorded = in_memory.events();
+        assert_eq!(recorded.len(), 2);
+        assert_eq!(recorded[0].level, TraceLevel::Warn);
+        assert_eq!(recorded[1].level, TraceLevel::Error);
+    }
+
+    #[test]
+    fn test_trace_sink_ext_with_multi_sink() {
+        let sink1 = Arc::new(InMemoryTraceSink::new());
+        let sink2 = Arc::new(InMemoryTraceSink::new());
+        let multi = MultiSink::new(vec![sink1.clone(), sink2.clone()]);
+
+        multi.info("event", "Test event");
+
+        assert_eq!(sink1.events().len(), 1);
+        assert_eq!(sink2.events().len(), 1);
+        assert_eq!(sink1.events()[0].message, "Test event");
+        assert_eq!(sink2.events()[0].message, "Test event");
     }
 }

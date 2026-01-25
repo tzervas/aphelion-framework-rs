@@ -144,8 +144,14 @@ pub fn run_example() -> AphelionResult<()> {
     println!("    - F16 Support: {}", gpu_caps.supports_f16);
     println!("    - BF16 Support: {}", gpu_caps.supports_bf16);
     println!("    - TF32 Support: {}", gpu_caps.supports_tf32);
-    println!("    - Max Memory: {} GB", gpu_caps.max_memory_bytes.unwrap_or(0) / (1024 * 1024 * 1024));
-    println!("    - Compute Units: {}\n", gpu_caps.compute_units.unwrap_or(0));
+    println!(
+        "    - Max Memory: {} GB",
+        gpu_caps.max_memory_bytes.unwrap_or(0) / (1024 * 1024 * 1024)
+    );
+    println!(
+        "    - Compute Units: {}\n",
+        gpu_caps.compute_units.unwrap_or(0)
+    );
 
     // Create a model and build with GPU backend
     let config = ModelConfig::new("gpu_model", "1.0.0")
@@ -163,7 +169,10 @@ pub fn run_example() -> AphelionResult<()> {
     println!("  Building with GPU backend:");
     let pipeline = BuildPipeline::new()
         .with_pre_hook(|ctx| {
-            println!("    - Pre-build: Checking {} availability", ctx.backend.name());
+            println!(
+                "    - Pre-build: Checking {} availability",
+                ctx.backend.name()
+            );
             Ok(())
         })
         .with_post_hook(|_ctx, graph| {
@@ -183,8 +192,14 @@ pub fn run_example() -> AphelionResult<()> {
     println!("    - F16 Support: {}", tpu_caps.supports_f16);
     println!("    - BF16 Support: {}", tpu_caps.supports_bf16);
     println!("    - TF32 Support: {}", tpu_caps.supports_tf32);
-    println!("    - Max Memory: {} GB", tpu_caps.max_memory_bytes.unwrap_or(0) / (1024 * 1024 * 1024));
-    println!("    - Compute Units: {}\n", tpu_caps.compute_units.unwrap_or(0));
+    println!(
+        "    - Max Memory: {} GB",
+        tpu_caps.max_memory_bytes.unwrap_or(0) / (1024 * 1024 * 1024)
+    );
+    println!(
+        "    - Compute Units: {}\n",
+        tpu_caps.compute_units.unwrap_or(0)
+    );
 
     // Create a model and build with TPU backend
     let config = ModelConfig::new("tpu_model", "1.0.0")

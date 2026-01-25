@@ -135,7 +135,11 @@ impl ConfigValidator for NameValidator {
 
         if config.name.is_empty() {
             errors.push(ValidationError::new("name", "Name cannot be empty"));
-        } else if !config.name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+        } else if !config
+            .name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        {
             errors.push(ValidationError::new(
                 "name",
                 "Name must contain only alphanumeric characters, dashes, and underscores",
@@ -218,8 +222,8 @@ fn is_valid_semver(version: &str) -> bool {
 /// use aphelion_core::config::ModelConfig;
 ///
 /// let validator = CompositeValidator::new()
-///     .add(Box::new(NameValidator))
-///     .add(Box::new(VersionValidator));
+///     .with_validator(Box::new(NameValidator))
+///     .with_validator(Box::new(VersionValidator));
 ///
 /// // Valid
 /// let config = ModelConfig::new("my-model", "1.0.0");
@@ -263,9 +267,9 @@ impl CompositeValidator {
     /// use aphelion_core::validation::{CompositeValidator, NameValidator};
     ///
     /// let validator = CompositeValidator::new()
-    ///     .add(Box::new(NameValidator));
+    ///     .with_validator(Box::new(NameValidator));
     /// ```
-    pub fn add(mut self, validator: Box<dyn ConfigValidator>) -> Self {
+    pub fn with_validator(mut self, validator: Box<dyn ConfigValidator>) -> Self {
         self.validators.push(validator);
         self
     }
@@ -371,8 +375,8 @@ mod tests {
     fn test_composite_validator_all_valid() {
         let config = ModelConfig::new("valid-model", "1.0.0");
         let composite = CompositeValidator::new()
-            .add(Box::new(NameValidator))
-            .add(Box::new(VersionValidator));
+            .with_validator(Box::new(NameValidator))
+            .with_validator(Box::new(VersionValidator));
 
         assert!(composite.validate(&config).is_ok());
     }
@@ -381,8 +385,8 @@ mod tests {
     fn test_composite_validator_multiple_errors() {
         let config = ModelConfig::new("", "");
         let composite = CompositeValidator::new()
-            .add(Box::new(NameValidator))
-            .add(Box::new(VersionValidator));
+            .with_validator(Box::new(NameValidator))
+            .with_validator(Box::new(VersionValidator));
 
         let result = composite.validate(&config);
         assert!(result.is_err());
@@ -396,8 +400,8 @@ mod tests {
     fn test_composite_validator_partial_errors() {
         let config = ModelConfig::new("valid-model", "");
         let composite = CompositeValidator::new()
-            .add(Box::new(NameValidator))
-            .add(Box::new(VersionValidator));
+            .with_validator(Box::new(NameValidator))
+            .with_validator(Box::new(VersionValidator));
 
         let result = composite.validate(&config);
         assert!(result.is_err());
