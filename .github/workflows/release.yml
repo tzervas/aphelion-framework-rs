@@ -73,13 +73,6 @@ jobs:
         run: cargo publish -p aphelion-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
         continue-on-error: true
 
-      - name: Wait for crates.io index
-        run: sleep 30
-
-      - name: Publish aphelion-examples
-        run: cargo publish -p aphelion-examples --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        continue-on-error: true
-
   # Build Python wheels for multiple platforms
   build-python-wheels:
     name: Build Python wheels (${{ matrix.os }})
