@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-01-26
+
+### Changed
+- Updated dependencies to latest patch versions:
+  - burn: 0.20 → 0.20.1
+  - pyo3: 0.27 → 0.27.2
+  - thiserror: 2.0 → 2.0.18
+  - half: 2.7 → 2.7.1
+- Updated qlora-candle fork to latest commit
+
 ## [1.2.4] - 2026-01-26
 
 ### Security - Unmaintained Dependency Fixes

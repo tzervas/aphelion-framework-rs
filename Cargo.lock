@@ -90,7 +90,7 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
 name = "aphelion-core"
-version = "1.2.4"
+version = "1.2.5"
 dependencies = [
  "aphelion-macros",
  "burn",
@@ -108,7 +108,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-examples"
-version = "1.2.4"
+version = "1.2.5"
 dependencies = [
  "aphelion-core",
  "serde_json",
@@ -116,7 +116,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-macros"
-version = "1.2.4"
+version = "1.2.5"
 dependencies = [
  "proc-macro2",
  "qlora-paste",
@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-python"
-version = "1.2.4"
+version = "1.2.5"
 dependencies = [
  "aphelion-core",
  "candle-core",
@@ -141,7 +141,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-tests"
-version = "1.2.4"
+version = "1.2.5"
 dependencies = [
  "aphelion-core",
  "serde_json",
@@ -1003,7 +1003,7 @@ dependencies = [
 [[package]]
 name = "candle-core"
 version = "0.9.2"
-source = "git+https://github.com/tzervas/qlora-candle.git?branch=use-qlora-gemm#4773ae37bcfc28bdeb049eb31ac95c2689936eaf"
+source = "git+https://github.com/tzervas/qlora-candle.git?branch=use-qlora-gemm#d390b4848c84998bc41550f225268b00c209e1a8"
 dependencies = [
  "byteorder",
  "candle-kernels",
@@ -1028,7 +1028,7 @@ dependencies = [
 [[package]]
 name = "candle-kernels"
 version = "0.9.2"
-source = "git+https://github.com/tzervas/qlora-candle.git?branch=use-qlora-gemm#4773ae37bcfc28bdeb049eb31ac95c2689936eaf"
+source = "git+https://github.com/tzervas/qlora-candle.git?branch=use-qlora-gemm#d390b4848c84998bc41550f225268b00c209e1a8"
 dependencies = [
  "bindgen_cuda",
 ]
@@ -1036,7 +1036,7 @@ dependencies = [
 [[package]]
 name = "candle-ug"
 version = "0.9.2"
-source = "git+https://github.com/tzervas/qlora-candle.git?branch=use-qlora-gemm#4773ae37bcfc28bdeb049eb31ac95c2689936eaf"
+source = "git+https://github.com/tzervas/qlora-candle.git?branch=use-qlora-gemm#d390b4848c84998bc41550f225268b00c209e1a8"
 dependencies = [
  "ug",
  "ug-cuda",
