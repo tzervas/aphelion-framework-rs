@@ -9,7 +9,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.2.2"
+version = "1.2.3"
 edition = "2021"
 rust-version = "1.92"
 license = "MIT"
@@ -48,10 +48,9 @@ pythonize = "0.27"
 pyo3-async-runtimes = "0.27"
 
 # Internal crates (path for dev, version for release)
-aphelion-macros = { version = "1.2.2", path = "crates/aphelion-macros" }
-aphelion-core = { version = "1.2.2", path = "crates/aphelion-core" }
+aphelion-macros = { version = "1.2.3", path = "crates/aphelion-macros" }
+aphelion-core = { version = "1.2.3", path = "crates/aphelion-core" }
 
-# Patch unmaintained paste crate with maintained fork
-# Requires patch-target branch in qlora-paste with name = "paste"
-[patch.crates-io]
-paste = { git = "https://github.com/tzervas/qlora-paste", branch = "patch-target" }
+# Note: paste 1.0.15 is a transitive dependency from burn/cubecl
+# When upstream adopts qlora-paste, update dependencies accordingly
+# See: https://github.com/tzervas/qlora-paste for the maintained fork

@@ -1,5 +1,13 @@
 # Aphelion Framework
 
+[![CI](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/ci.yml)
+[![Security Audit](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/security.yml/badge.svg)](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/security.yml)
+[![crates.io](https://img.shields.io/crates/v/aphelion-core.svg)](https://crates.io/crates/aphelion-core)
+[![docs.rs](https://docs.rs/aphelion-core/badge.svg)](https://docs.rs/aphelion-core)
+[![PyPI](https://img.shields.io/pypi/v/aphelion-framework.svg)](https://pypi.org/project/aphelion-framework/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![MSRV](https://img.shields.io/badge/MSRV-1.92-blue.svg)](https://blog.rust-lang.org/)
+
 A unified frontend for AI model development in Rust.
 
 ## Overview

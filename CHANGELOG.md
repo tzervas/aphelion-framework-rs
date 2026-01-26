@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-01-26
+
+### Changed
+- Removed broken git patch for paste crate (patch-target branch no longer exists)
+- Added documentation comment noting paste is a transitive dependency from burn/cubecl
+- When upstream burn/cubecl adopt qlora-paste, dependencies can be updated accordingly
+
+### Note
+- qlora-paste v1.0.17+ is now available on crates.io as a maintained fork
+- Direct replacement requires import changes (`use qlora_paste::paste` vs `use paste::paste`)
+- Waiting for upstream adoption in burn/cubecl ecosystem
+
 ## [1.2.2] - 2026-01-26
 
 ### Changed
