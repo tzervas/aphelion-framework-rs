@@ -34,6 +34,7 @@ tokio = { version = "1", features = ["rt", "macros", "time"] }
 syn = { version = "2", features = ["full", "extra-traits"] }
 quote = "1"
 proc-macro2 = "1"
+qlora-paste = "1.0"
 
 # Ecosystem dependencies (feature-gated)
 burn = "0.20"
@@ -51,6 +52,3 @@ pyo3-async-runtimes = "0.27"
 aphelion-macros = { version = "1.2.3", path = "crates/aphelion-macros" }
 aphelion-core = { version = "1.2.3", path = "crates/aphelion-core" }
 
-# Note: paste 1.0.15 is a transitive dependency from burn/cubecl
-# When upstream adopts qlora-paste, update dependencies accordingly
-# See: https://github.com/tzervas/qlora-paste for the maintained fork

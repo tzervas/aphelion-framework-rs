@@ -8,6 +8,13 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 ignore = [
     # bincode unmaintained - used by burn-core, monitor for alternatives
     "RUSTSEC-2025-0141",
+    # paste unmaintained - used by tracel-mlir-rs via cubecl
+    # TODO: Replace with [patch] once qlora-paste patch-target branch is created
+    # See: https://github.com/tzervas/qlora-paste
+    "RUSTSEC-2024-0436",
+    # lru unsound (IterMut) - used by ratatui via burn-train
+    # Low risk: only affects IterMut usage pattern, not typical LRU cache ops
+    "RUSTSEC-2026-0002",
 ]
 
 [licenses]

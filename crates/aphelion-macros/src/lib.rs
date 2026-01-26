@@ -2,6 +2,11 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Fields, Generics, Item, ItemStruct, Type};
 
+// qlora-paste is available for token pasting macros
+// Usage: qlora_paste::paste! { ... }
+#[allow(unused_imports)]
+use qlora_paste::paste;
+
 /// Attribute macro for marking a model builder type.
 ///
 /// Generates a `ConfigSpec` impl and a `ModelBuilder` impl
