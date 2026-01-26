@@ -52,6 +52,58 @@ The following are in scope for security reports:
 - Issues in third-party dependencies (report these upstream)
 - Social engineering attacks
 
+## Unmaintained Dependency Mitigation
+
+### Background
+
+Several transitive dependencies in the Rust AI ecosystem are currently unmaintained:
+
+| Crate | Status | Advisory |
+|-------|--------|----------|
+| `paste` | Unmaintained | [RUSTSEC-2024-0436](https://rustsec.org/advisories/RUSTSEC-2024-0436) |
+| `gemm` | Unmaintained | [RUSTSEC-2024-0428](https://rustsec.org/advisories/RUSTSEC-2024-0428) |
+
+These crates are transitive dependencies via `candle-core` (used by the Rust AI ecosystem including `burn` and `cubecl`).
+
+### Maintained Forks
+
+We maintain actively patched forks of these dependencies:
+
+| Original | Maintained Fork | Version | Repository |
+|----------|-----------------|---------|------------|
+| `paste` | `qlora-paste` | 1.0.20+ | [github.com/tzervas/qlora-paste](https://github.com/tzervas/qlora-paste) |
+| `gemm` | `qlora-gemm` | 0.20.0+ | [github.com/tzervas/qlora-gemm](https://github.com/tzervas/qlora-gemm) |
+| `candle-core` | `qlora-candle` | 0.9.x | [github.com/tzervas/qlora-candle](https://github.com/tzervas/qlora-candle) |
+
+### Upstream Contribution
+
+We have submitted a PR to merge these fixes upstream to HuggingFace Candle:
+
+- **PR**: [huggingface/candle#3335](https://github.com/huggingface/candle/pull/3335)
+- **Status**: Pending review
+- **Impact**: Once merged, all candle-dependent projects can use maintained dependencies
+
+### For Other Projects
+
+If your project depends on `candle-core` and you want to use maintained dependencies, add this to your `Cargo.toml`:
+
+```toml
+[patch.crates-io]
+candle-core = { git = "https://github.com/tzervas/qlora-candle.git", branch = "use-qlora-gemm" }
+```
+
+This patches the entire dependency tree to use:
+- `qlora-gemm` instead of `gemm`
+- `qlora-paste` instead of `paste`
+
+### Dependency Chain
+
+```
+candle-core (qlora-candle)
+└── qlora-gemm v0.20.0
+    └── qlora-paste v1.0.20
+```
+
 ## Security Best Practices for Users
 
 When using Aphelion Framework:
@@ -60,3 +112,4 @@ When using Aphelion Framework:
 2. Run `cargo audit` regularly on your projects
 3. Use the latest stable Rust compiler
 4. Review any unsafe code blocks when contributing
+5. Use the maintained fork patches if security audits flag `paste` or `gemm`

@@ -10,6 +10,8 @@
 
 A unified frontend for AI model development in Rust.
 
+> **Security Note**: This project uses maintained forks (`qlora-paste`, `qlora-gemm`, `qlora-candle`) to replace unmaintained transitive dependencies. See [SECURITY.md](SECURITY.md#unmaintained-dependency-mitigation) for details. Upstream PR: [huggingface/candle#3335](https://github.com/huggingface/candle/pull/3335)
+
 ## Overview
 
 Aphelion is a framework frontend that provides an easier entrypoint for AI engineering tasks. It unifies access to Rust AI libraries through a consistent API, handling the complexity of model configuration, pipeline orchestration, and hardware abstraction so you can focus on building models.
@@ -693,6 +695,8 @@ Example output from tritter_demo:
 
 | Version | Features |
 |---------|----------|
+| 1.2.4 | Security: Replaced unmaintained `paste`/`gemm` with maintained forks. See [SECURITY.md](SECURITY.md#unmaintained-dependency-mitigation) |
+| 1.2.3 | Documentation updates for dependency tracking |
 | 1.2.2 | tritter-accel integration, enhanced documentation |
 | 1.2.1 | rust-ai-core v0.2.6 integration, Python bindings, memory tracking |
 | 1.1.0 | Typed params, preset pipelines, async execution, backend auto-detect |

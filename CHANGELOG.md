@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-01-26
+
+### Security - Unmaintained Dependency Fixes
+
+This release replaces unmaintained transitive dependencies with actively maintained forks:
+
+- **paste** (unmaintained) → **qlora-paste v1.0.20** (maintained fork)
+- **gemm** (unmaintained) → **qlora-gemm v0.20.0** (maintained fork)
+- **candle-core** patched via **qlora-candle** to use maintained dependencies
+
+### Changed
+- Added `[patch.crates-io]` for candle-core pointing to qlora-candle fork
+- Dependency chain now uses maintained forks:
+  ```
+  candle-core (qlora-candle) -> qlora-gemm v0.20.0 -> qlora-paste v1.0.20
+  ```
+- Added qlora-paste v1.0.20 as direct dependency in aphelion-macros
+- Added qlora-gemm v0.20.0 to workspace dependencies
+- Updated security workflow to handle advisory warnings appropriately
+- Added deny.toml ignore entries for tracked transitive advisories
+
+### Upstream Contributions
+- PR to huggingface/candle for upstream adoption: https://github.com/huggingface/candle/pull/3335
+- Once merged, the `[patch.crates-io]` can be removed
+
+### Note
+For other projects wanting to adopt these maintained forks, add to Cargo.toml:
+```toml
+[patch.crates-io]
+candle-core = { git = "https://github.com/tzervas/qlora-candle.git", branch = "use-qlora-gemm" }
+```
+
 ## [1.2.3] - 2026-01-26
 
 ### Changed
