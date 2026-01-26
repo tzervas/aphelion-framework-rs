@@ -224,9 +224,7 @@ impl Clone for TriterAccelBackend {
         Self {
             device: self.device.clone(),
             mode: self.mode.clone(),
-            initialized: Arc::new(AtomicBool::new(
-                self.initialized.load(Ordering::SeqCst),
-            )),
+            initialized: Arc::new(AtomicBool::new(self.initialized.load(Ordering::SeqCst))),
         }
     }
 }
@@ -476,7 +474,7 @@ impl Backend for TriterAccelBackend {
                 supports_tf32: true,
                 // Actual values would be queried from the device
                 max_memory_bytes: Some(8 * 1024 * 1024 * 1024), // 8 GB placeholder
-                compute_units: Some(128), // Placeholder
+                compute_units: Some(128),                       // Placeholder
             },
             TriterDevice::Metal => DeviceCapabilities {
                 supports_f16: true,
@@ -744,6 +742,9 @@ mod tests {
         ];
 
         let devices: Vec<&str> = backends.iter().map(|b| b.device()).collect();
-        assert_eq!(devices, vec!["cuda:0", "cuda:1", "cuda:2", "cuda:3", "cuda:n"]);
+        assert_eq!(
+            devices,
+            vec!["cuda:0", "cuda:1", "cuda:2", "cuda:3", "cuda:n"]
+        );
     }
 }

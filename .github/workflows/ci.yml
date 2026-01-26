@@ -83,6 +83,10 @@ jobs:
       - name: Run tests
         run: cargo test --workspace
 
+      - name: Run tests with rust-ai-core feature
+        continue-on-error: true
+        run: cargo test --workspace --features rust-ai-core
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest

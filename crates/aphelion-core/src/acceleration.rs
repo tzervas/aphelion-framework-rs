@@ -166,7 +166,7 @@ pub enum AccelMode {
 ///
 /// let backend = NullBackend::cpu();
 /// let trace = InMemoryTraceSink::new();
-/// let ctx = BuildContext { backend: &backend, trace: &trace };
+/// let ctx = BuildContext::new(&backend, &trace);
 /// let mut graph = BuildGraph::default();
 ///
 /// stage.execute(&ctx, &mut graph).unwrap();
@@ -348,10 +348,8 @@ impl AccelerationStage {
                 serde_json::Value::Bool(config.use_ternary_layers),
             );
             if config.use_kv_cache {
-                node.metadata.insert(
-                    "accel.kv_cache".to_string(),
-                    serde_json::Value::Bool(true),
-                );
+                node.metadata
+                    .insert("accel.kv_cache".to_string(), serde_json::Value::Bool(true));
                 if let Some(max_seq_len) = config.max_seq_len {
                     node.metadata.insert(
                         "accel.max_seq_len".to_string(),
@@ -391,12 +389,8 @@ impl PipelineStage for AccelerationStage {
 
     fn execute(&self, ctx: &BuildContext, graph: &mut BuildGraph) -> AphelionResult<()> {
         match &self.mode {
-            AccelMode::Training(config) => {
-                self.apply_training_acceleration(ctx, graph, config)
-            }
-            AccelMode::Inference(config) => {
-                self.apply_inference_acceleration(ctx, graph, config)
-            }
+            AccelMode::Training(config) => self.apply_training_acceleration(ctx, graph, config),
+            AccelMode::Inference(config) => self.apply_inference_acceleration(ctx, graph, config),
         }
     }
 }
@@ -618,10 +612,7 @@ mod tests {
         let stage = AccelerationStage::for_training(0.1);
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let mut graph = BuildGraph::default();
         graph.add_node("linear1", ModelConfig::new("linear", "1.0"));
@@ -649,10 +640,7 @@ mod tests {
         let stage = AccelerationStage::for_inference(32);
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let mut graph = BuildGraph::default();
         graph.add_node("linear1", ModelConfig::new("linear", "1.0"));
@@ -679,10 +667,7 @@ mod tests {
         let hook = gradient_compression_pre_hook(0.1, 42);
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let result = hook(&ctx);
         assert!(result.is_ok());
@@ -697,10 +682,7 @@ mod tests {
         let hook = gradient_compression_post_hook();
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let mut graph = BuildGraph::default();
         graph.add_node("linear", ModelConfig::new("linear", "1.0"));
@@ -711,10 +693,7 @@ mod tests {
 
         // Clear events and run post hook
         let trace2 = InMemoryTraceSink::new();
-        let ctx2 = BuildContext {
-            backend: &backend,
-            trace: &trace2,
-        };
+        let ctx2 = BuildContext::new(&backend, &trace2);
 
         let result = hook(&ctx2, &graph);
         assert!(result.is_ok());
@@ -730,10 +709,7 @@ mod tests {
         // We can't directly access stages count, but we can test execution
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let mut graph = BuildGraph::default();
         graph.add_node("linear", ModelConfig::new("linear", "1.0"));
@@ -747,10 +723,7 @@ mod tests {
         let pipeline = inference_pipeline(32);
         let backend = NullBackend::cpu();
         let trace = InMemoryTraceSink::new();
-        let ctx = BuildContext {
-            backend: &backend,
-            trace: &trace,
-        };
+        let ctx = BuildContext::new(&backend, &trace);
 
         let mut graph = BuildGraph::default();
         graph.add_node("linear", ModelConfig::new("linear", "1.0"));

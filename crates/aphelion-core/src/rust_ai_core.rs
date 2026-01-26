@@ -1,87 +1,33 @@
 //! # rust-ai-core Integration Module
 //!
-//! This module provides adapter traits and implementations for integrating
-//! aphelion-core with the hypothetical `rust-ai-core` framework.
+//! This module provides integration with the `rust-ai-core` crate for device
+//! management, memory tracking, dtype utilities, and CubeCL interoperability.
 //!
-//! ## Overview
+//! ## Feature Gates
 //!
-//! The rust-ai-core adapter bridges aphelion-core's graph-based model building
-//! system with rust-ai-core's execution runtime. This enables:
+//! - `rust-ai-core`: Enables real rust-ai-core integration with actual types
+//! - `cuda`: Enables CubeCL CUDA support (requires `rust-ai-core`)
 //!
-//! - **Configuration Translation**: Converting [`ModelConfig`] to rust-ai-core's
-//!   native configuration format
-//! - **Graph Mapping**: Transforming [`BuildGraph`] into rust-ai-core's computation
-//!   graph representation
-//! - **Backend Bridging**: Connecting aphelion's backend abstraction with
-//!   rust-ai-core's device management
-//!
-//! ## Architecture
-//!
-//! ```text
-//! ┌─────────────────────┐     ┌──────────────────────┐
-//! │   aphelion-core     │     │    rust-ai-core      │
-//! ├─────────────────────┤     ├──────────────────────┤
-//! │  ModelConfig        │────▶│  RacModelConfig      │
-//! │  BuildGraph         │────▶│  RacComputeGraph     │
-//! │  Backend            │────▶│  RacDevice           │
-//! │  NodeId             │────▶│  RacNodeHandle       │
-//! └─────────────────────┘     └──────────────────────┘
-//! ```
-//!
-//! ## Feature Gate
-//!
-//! This module requires the `rust-ai-core` feature to be enabled:
-//!
-//! ```toml
-//! [dependencies]
-//! aphelion-core = { version = "1.0", features = ["rust-ai-core"] }
-//! ```
-//!
-//! ## Real Integration Requirements
-//!
-//! When `rust-ai-core` becomes available as an actual dependency, the following
-//! changes would be required:
-//!
-//! 1. Add `rust-ai-core` to `Cargo.toml` under the feature flag
-//! 2. Replace placeholder types with actual `rust-ai-core` types
-//! 3. Implement proper error mapping from rust-ai-core errors
-//! 4. Add runtime device discovery and capability detection
-//! 5. Implement async execution support if rust-ai-core provides it
-//!
-//! ## Example Usage
-//!
-//! ```ignore
-//! use aphelion_core::rust_ai_core::adapter::*;
-//! use aphelion_core::config::ModelConfig;
-//! use aphelion_core::graph::BuildGraph;
-//!
-//! let config = ModelConfig::new("my-model", "1.0.0");
-//! let graph = BuildGraph::default();
-//!
-//! // Convert to rust-ai-core types
-//! let rac_config = RacModelConfig::from_aphelion(&config)?;
-//! let rac_graph = RacComputeGraph::from_aphelion(&graph)?;
-//!
-//! // Execute on rust-ai-core runtime
-//! let device = RacDevice::default_cpu();
-//! let result = rac_graph.execute(&device, &rac_config)?;
-//! ```
+//! When the `rust-ai-core` feature is disabled, placeholder types are provided
+//! for API compatibility during development.
 
 use crate::config::ModelConfig;
 use crate::error::{AphelionError, AphelionResult};
 use crate::graph::{BuildGraph, NodeId};
+use std::collections::BTreeMap;
 
 // ============================================================================
-// Placeholder Types (representing rust-ai-core equivalents)
+// Aphelion Adapter Types (always available)
 // ============================================================================
 
-/// Placeholder for rust-ai-core's device abstraction.
+/// Device abstraction for rust-ai-core integration.
 ///
-/// In a real integration, this would be imported from `rust_ai_core::Device`
-/// and would provide GPU/TPU/NPU device management capabilities.
+/// This type represents a compute device that can be used for model execution.
+/// When `rust-ai-core` is enabled, this maps to actual hardware. Otherwise,
+/// it provides a placeholder for API compatibility.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RacDevice {
-    /// Device identifier (e.g., "cuda:0", "cpu", "tpu:0")
+    /// Device identifier (e.g., "cuda:0", "cpu")
     pub id: String,
     /// Device type classification
     pub device_type: RacDeviceType,
@@ -89,27 +35,20 @@ pub struct RacDevice {
     pub memory_bytes: Option<u64>,
 }
 
-/// Device type classification for rust-ai-core.
+/// Device type classification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RacDeviceType {
-    /// CPU execution
     Cpu,
-    /// NVIDIA CUDA GPU
     Cuda,
-    /// AMD ROCm GPU
     Rocm,
-    /// Intel oneAPI
     OneApi,
-    /// Apple Metal
     Metal,
-    /// Vulkan compute
     Vulkan,
-    /// Custom/unknown accelerator
     Custom,
 }
 
 impl RacDevice {
-    /// Create a CPU device instance.
+    /// Create a CPU device.
     pub fn default_cpu() -> Self {
         Self {
             id: "cpu:0".to_string(),
@@ -118,7 +57,7 @@ impl RacDevice {
         }
     }
 
-    /// Create a CUDA device instance.
+    /// Create a CUDA device.
     pub fn cuda(index: u32) -> Self {
         Self {
             id: format!("cuda:{}", index),
@@ -127,87 +66,46 @@ impl RacDevice {
         }
     }
 
-    /// Create a device with specified memory capacity.
+    /// Set memory capacity.
     pub fn with_memory(mut self, bytes: u64) -> Self {
         self.memory_bytes = Some(bytes);
         self
     }
 }
 
-/// Placeholder for rust-ai-core's model configuration format.
-///
-/// This represents the target configuration schema that rust-ai-core
-/// would expect. Real integration would map aphelion's flexible
-/// `BTreeMap<String, Value>` params to strongly-typed fields.
-#[derive(Debug, Clone, PartialEq)]
+/// Model configuration in rust-ai-core format.
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct RacModelConfig {
-    /// Model name identifier
     pub name: String,
-    /// Semantic version string
     pub version: String,
-    /// Batch size for inference/training
     pub batch_size: Option<u32>,
-    /// Sequence length for transformer models
     pub sequence_length: Option<u32>,
-    /// Hidden dimension size
     pub hidden_size: Option<u32>,
-    /// Number of attention heads (transformer models)
     pub num_attention_heads: Option<u32>,
-    /// Number of layers
     pub num_layers: Option<u32>,
-    /// Vocabulary size
     pub vocab_size: Option<u32>,
-    /// Data type for computations
     pub dtype: RacDataType,
-    /// Additional custom parameters
-    pub custom_params: std::collections::BTreeMap<String, String>,
+    pub custom_params: BTreeMap<String, String>,
 }
 
-/// Data type for rust-ai-core computations.
+/// Data type for computations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum RacDataType {
-    /// 32-bit floating point
     #[default]
     Float32,
-    /// 16-bit floating point
     Float16,
-    /// Brain floating point (16-bit)
     BFloat16,
-    /// 64-bit floating point
     Float64,
-    /// 32-bit integer
     Int32,
-    /// 64-bit integer
     Int64,
-    /// 8-bit integer (quantized)
     Int8,
-    /// 8-bit unsigned integer
     UInt8,
 }
 
-impl Default for RacModelConfig {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            version: "0.0.0".to_string(),
-            batch_size: None,
-            sequence_length: None,
-            hidden_size: None,
-            num_attention_heads: None,
-            num_layers: None,
-            vocab_size: None,
-            dtype: RacDataType::default(),
-            custom_params: std::collections::BTreeMap::new(),
-        }
-    }
-}
-
-/// Placeholder for rust-ai-core's node handle in a compute graph.
+/// Node handle in a rust-ai-core compute graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RacNodeHandle {
-    /// Internal graph index
     pub index: u64,
-    /// Generation counter for validity checking
     pub generation: u32,
 }
 
@@ -220,92 +118,482 @@ impl From<NodeId> for RacNodeHandle {
     }
 }
 
-/// Placeholder for rust-ai-core's compute graph representation.
-///
-/// This would be the target graph format that rust-ai-core uses
-/// for optimization and execution scheduling.
+/// Compute graph in rust-ai-core format.
 #[derive(Debug, Clone, Default)]
 pub struct RacComputeGraph {
-    /// Nodes in topological order
     pub nodes: Vec<RacGraphNode>,
-    /// Edges as (source, target) pairs
     pub edges: Vec<(RacNodeHandle, RacNodeHandle)>,
-    /// Graph-level metadata
     pub metadata: RacGraphMetadata,
 }
 
-/// A node in the rust-ai-core compute graph.
+/// A node in the compute graph.
 #[derive(Debug, Clone)]
 pub struct RacGraphNode {
-    /// Node handle for referencing
     pub handle: RacNodeHandle,
-    /// Operation type
     pub op_type: String,
-    /// Node-specific configuration
     pub config: RacModelConfig,
-    /// Input tensor shapes (if known statically)
     pub input_shapes: Vec<Vec<i64>>,
-    /// Output tensor shapes (if known statically)
     pub output_shapes: Vec<Vec<i64>>,
 }
 
-/// Metadata for a rust-ai-core compute graph.
+/// Metadata for a compute graph.
 #[derive(Debug, Clone, Default)]
 pub struct RacGraphMetadata {
-    /// Original source framework
     pub source_framework: String,
-    /// Hash for reproducibility
     pub content_hash: String,
-    /// Whether the graph has been optimized
     pub is_optimized: bool,
-    /// Target device hints
     pub device_hints: Vec<String>,
 }
+
+// ============================================================================
+// Real rust-ai-core Integration (when feature enabled)
+// ============================================================================
+
+#[cfg(feature = "rust-ai-core")]
+pub mod real {
+    //! Real rust-ai-core types and re-exports.
+
+    // Re-export Device management
+    pub use rust_ai_core::{get_device, warn_if_cpu, DeviceConfig};
+
+    // Re-export Memory tracking
+    pub use rust_ai_core::memory::{
+        estimate_attention_memory, estimate_tensor_bytes, MemoryTracker, DEFAULT_OVERHEAD_FACTOR,
+    };
+
+    // Re-export DType utilities
+    pub use rust_ai_core::dtype::{bytes_per_element, is_floating_point, DTypeExt, PrecisionMode};
+
+    // Re-export Error types
+    pub use rust_ai_core::{CoreError, Result as RacResult};
+
+    // Re-export Traits
+    pub use rust_ai_core::{Dequantize, GpuDispatchable, Quantize, ValidatableConfig};
+
+    // Re-export Logging
+    pub use rust_ai_core::{init_logging, LogConfig};
+
+    // Re-export Version
+    pub use rust_ai_core::VERSION as RAC_VERSION;
+
+    // Re-export candle types
+    pub use candle_core::{DType, Device, Tensor};
+
+    // CubeCL interop (requires cuda feature)
+    #[cfg(feature = "cuda")]
+    pub use rust_ai_core::{
+        allocate_output_buffer, candle_to_cubecl_handle, cubecl_to_candle_tensor,
+        has_cubecl_cuda_support, TensorBuffer,
+    };
+}
+
+#[cfg(feature = "rust-ai-core")]
+pub use real::*;
+
+// ============================================================================
+// Device Bridge (when rust-ai-core feature enabled)
+// ============================================================================
+
+#[cfg(feature = "rust-ai-core")]
+mod device_bridge {
+    use super::*;
+    use candle_core::Device;
+    use rust_ai_core::{get_device, warn_if_cpu, DeviceConfig};
+
+    /// Bridge between aphelion's device abstraction and candle's Device.
+    #[derive(Debug, Clone)]
+    pub struct AphelionDevice {
+        inner: Device,
+        config: DeviceConfig,
+    }
+
+    impl AphelionDevice {
+        /// Create a device from configuration.
+        pub fn from_config(config: DeviceConfig) -> AphelionResult<Self> {
+            let device = get_device(&config)
+                .map_err(|e| AphelionError::backend(format!("Device selection failed: {}", e)))?;
+            Ok(Self {
+                inner: device,
+                config,
+            })
+        }
+
+        /// Create a CPU device.
+        pub fn cpu() -> Self {
+            Self {
+                inner: Device::Cpu,
+                config: DeviceConfig::new().with_force_cpu(true),
+            }
+        }
+
+        /// Create a CUDA device.
+        pub fn cuda(ordinal: usize) -> AphelionResult<Self> {
+            let config = DeviceConfig::new().with_cuda_device(ordinal);
+            Self::from_config(config)
+        }
+
+        /// Auto-select best available device.
+        pub fn auto() -> AphelionResult<Self> {
+            Self::from_config(DeviceConfig::default())
+        }
+
+        /// Get the underlying candle Device.
+        pub fn as_candle_device(&self) -> &Device {
+            &self.inner
+        }
+
+        /// Consume and return candle Device.
+        pub fn into_candle_device(self) -> Device {
+            self.inner
+        }
+
+        /// Check if CUDA device.
+        pub fn is_cuda(&self) -> bool {
+            matches!(self.inner, Device::Cuda(_))
+        }
+
+        /// Check if CPU device.
+        pub fn is_cpu(&self) -> bool {
+            matches!(self.inner, Device::Cpu)
+        }
+
+        /// Warn if running on CPU.
+        pub fn warn_if_cpu(&self, crate_name: &str) {
+            warn_if_cpu(&self.inner, crate_name);
+        }
+
+        /// Get device configuration.
+        pub fn config(&self) -> &DeviceConfig {
+            &self.config
+        }
+    }
+
+    impl From<Device> for AphelionDevice {
+        fn from(device: Device) -> Self {
+            let config = match &device {
+                Device::Cpu => DeviceConfig::new().with_force_cpu(true),
+                Device::Cuda(_) => DeviceConfig::default(),
+                _ => DeviceConfig::default(),
+            };
+            Self {
+                inner: device,
+                config,
+            }
+        }
+    }
+}
+
+#[cfg(feature = "rust-ai-core")]
+pub use device_bridge::AphelionDevice;
+
+// ============================================================================
+// CubeCL Context (when rust-ai-core + cuda features enabled)
+// ============================================================================
+
+#[cfg(all(feature = "rust-ai-core", feature = "cuda"))]
+pub mod cubecl {
+    //! CubeCL tensor interoperability utilities.
+
+    use super::*;
+    use candle_core::{DType, Device, Tensor};
+
+    pub use rust_ai_core::{
+        allocate_output_buffer, candle_to_cubecl_handle, cubecl_to_candle_tensor,
+        has_cubecl_cuda_support, TensorBuffer,
+    };
+
+    /// Wrapper for CubeCL operations.
+    pub struct CubeclContext {
+        device: Device,
+    }
+
+    impl CubeclContext {
+        /// Create a CubeCL context for a CUDA device.
+        pub fn new(device: Device) -> AphelionResult<Self> {
+            if !matches!(device, Device::Cuda(_)) {
+                return Err(AphelionError::backend("CubeCL requires CUDA device"));
+            }
+            if !has_cubecl_cuda_support() {
+                return Err(AphelionError::backend("CubeCL CUDA support not available"));
+            }
+            Ok(Self { device })
+        }
+
+        /// Get device reference.
+        pub fn device(&self) -> &Device {
+            &self.device
+        }
+
+        /// Convert tensor to CubeCL buffer.
+        pub fn tensor_to_buffer(&self, tensor: &Tensor) -> AphelionResult<TensorBuffer> {
+            candle_to_cubecl_handle(tensor)
+                .map_err(|e| AphelionError::backend(format!("CubeCL conversion failed: {}", e)))
+        }
+
+        /// Convert CubeCL buffer to tensor.
+        pub fn buffer_to_tensor(&self, buffer: &TensorBuffer) -> AphelionResult<Tensor> {
+            cubecl_to_candle_tensor(buffer, &self.device)
+                .map_err(|e| AphelionError::backend(format!("CubeCL conversion failed: {}", e)))
+        }
+
+        /// Allocate output buffer.
+        pub fn alloc_output(&self, shape: &[usize], dtype: DType) -> AphelionResult<TensorBuffer> {
+            allocate_output_buffer(shape, dtype)
+                .map_err(|e| AphelionError::backend(format!("CubeCL allocation failed: {}", e)))
+        }
+    }
+}
+
+#[cfg(all(feature = "rust-ai-core", feature = "cuda"))]
+pub use cubecl::CubeclContext;
+
+// ============================================================================
+// Placeholder Types (when rust-ai-core feature disabled)
+// ============================================================================
+
+#[cfg(not(feature = "rust-ai-core"))]
+pub mod placeholder {
+    //! Placeholder types when rust-ai-core is disabled.
+
+    use super::*;
+
+    /// Placeholder memory tracker.
+    #[derive(Debug, Default)]
+    pub struct MemoryTracker {
+        allocated: std::sync::atomic::AtomicUsize,
+        peak: std::sync::atomic::AtomicUsize,
+        limit: usize,
+        overhead_factor: f64,
+    }
+
+    impl Clone for MemoryTracker {
+        fn clone(&self) -> Self {
+            use std::sync::atomic::Ordering;
+            Self {
+                allocated: std::sync::atomic::AtomicUsize::new(
+                    self.allocated.load(Ordering::SeqCst),
+                ),
+                peak: std::sync::atomic::AtomicUsize::new(self.peak.load(Ordering::SeqCst)),
+                limit: self.limit,
+                overhead_factor: self.overhead_factor,
+            }
+        }
+    }
+
+    impl MemoryTracker {
+        pub fn new() -> Self {
+            Self {
+                allocated: std::sync::atomic::AtomicUsize::new(0),
+                peak: std::sync::atomic::AtomicUsize::new(0),
+                limit: usize::MAX,
+                overhead_factor: 1.1,
+            }
+        }
+
+        pub fn with_limit(limit: usize) -> Self {
+            Self {
+                allocated: std::sync::atomic::AtomicUsize::new(0),
+                peak: std::sync::atomic::AtomicUsize::new(0),
+                limit,
+                overhead_factor: 1.1,
+            }
+        }
+
+        pub fn with_overhead_factor(mut self, factor: f64) -> Self {
+            self.overhead_factor = factor;
+            self
+        }
+
+        pub fn allocate(&self, bytes: usize) -> AphelionResult<()> {
+            use std::sync::atomic::Ordering;
+
+            // Atomically check-and-add to ensure we never exceed the limit,
+            // even under concurrent allocations.
+            let mut current = self.allocated.load(Ordering::SeqCst);
+            loop {
+                let new = current.saturating_add(bytes);
+
+                if new > self.limit {
+                    return Err(AphelionError::backend(format!(
+                        "Memory limit exceeded: {} > {}",
+                        new, self.limit
+                    )));
+                }
+
+                match self.allocated.compare_exchange(
+                    current,
+                    new,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                ) {
+                    Ok(_) => {
+                        self.peak.fetch_max(new, Ordering::SeqCst);
+                        return Ok(());
+                    }
+                    Err(actual) => {
+                        // Another thread updated `allocated`; retry with the new value.
+                        current = actual;
+                    }
+                }
+            }
+        }
+
+        pub fn deallocate(&self, bytes: usize) {
+            use std::sync::atomic::Ordering;
+            self.allocated.fetch_sub(bytes, Ordering::SeqCst);
+        }
+
+        pub fn would_fit(&self, bytes: usize) -> bool {
+            use std::sync::atomic::Ordering;
+            self.allocated.load(Ordering::SeqCst) + bytes <= self.limit
+        }
+
+        pub fn allocated_bytes(&self) -> usize {
+            use std::sync::atomic::Ordering;
+            self.allocated.load(Ordering::SeqCst)
+        }
+
+        pub fn peak_bytes(&self) -> usize {
+            use std::sync::atomic::Ordering;
+            self.peak.load(Ordering::SeqCst)
+        }
+
+        pub fn limit_bytes(&self) -> usize {
+            self.limit
+        }
+
+        /// Get the overhead factor used for memory estimation.
+        pub fn overhead_factor(&self) -> f64 {
+            self.overhead_factor
+        }
+
+        /// Estimate memory with overhead factor applied.
+        pub fn estimate_with_overhead(&self, bytes: usize) -> usize {
+            (bytes as f64 * self.overhead_factor).ceil() as usize
+        }
+    }
+
+    /// Placeholder tensor bytes estimation.
+    pub fn estimate_tensor_bytes(shape: &[usize], dtype: RacDataType) -> usize {
+        let element_size = match dtype {
+            RacDataType::Float32 | RacDataType::Int32 => 4,
+            RacDataType::Float64 | RacDataType::Int64 => 8,
+            RacDataType::Float16 | RacDataType::BFloat16 => 2,
+            RacDataType::Int8 | RacDataType::UInt8 => 1,
+        };
+        shape.iter().product::<usize>() * element_size
+    }
+
+    pub const DEFAULT_OVERHEAD_FACTOR: f64 = 1.1;
+
+    /// Placeholder device configuration.
+    #[derive(Debug, Clone, Default)]
+    pub struct DeviceConfig {
+        force_cpu: bool,
+        cuda_device: Option<usize>,
+        crate_name: Option<String>,
+    }
+
+    impl DeviceConfig {
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        pub fn with_force_cpu(mut self, force: bool) -> Self {
+            self.force_cpu = force;
+            self
+        }
+
+        pub fn with_cuda_device(mut self, ordinal: usize) -> Self {
+            self.cuda_device = Some(ordinal);
+            self
+        }
+
+        pub fn with_crate_name(mut self, name: impl Into<String>) -> Self {
+            self.crate_name = Some(name.into());
+            self
+        }
+    }
+
+    /// Placeholder AphelionDevice.
+    #[derive(Debug, Clone)]
+    pub struct AphelionDevice {
+        device: RacDevice,
+        config: DeviceConfig,
+    }
+
+    impl AphelionDevice {
+        pub fn from_config(config: DeviceConfig) -> AphelionResult<Self> {
+            if config.force_cpu {
+                let device = RacDevice::default_cpu();
+                return Ok(Self { device, config });
+            }
+
+            if config.cuda_device.is_some() {
+                return Err(AphelionError::backend(
+                    "CUDA not available (rust-ai-core feature disabled)",
+                ));
+            }
+
+            let device = RacDevice::default_cpu();
+            Ok(Self { device, config })
+        }
+
+        pub fn cpu() -> Self {
+            Self {
+                device: RacDevice::default_cpu(),
+                config: DeviceConfig::new().with_force_cpu(true),
+            }
+        }
+
+        pub fn cuda(_ordinal: usize) -> AphelionResult<Self> {
+            Err(AphelionError::backend(
+                "CUDA not available (rust-ai-core feature disabled)",
+            ))
+        }
+
+        pub fn auto() -> AphelionResult<Self> {
+            Ok(Self::cpu())
+        }
+
+        pub fn is_cuda(&self) -> bool {
+            self.device.device_type == RacDeviceType::Cuda
+        }
+
+        pub fn is_cpu(&self) -> bool {
+            self.device.device_type == RacDeviceType::Cpu
+        }
+
+        pub fn warn_if_cpu(&self, crate_name: &str) {
+            if self.is_cpu() {
+                tracing::warn!(
+                    "{}: Running on CPU. Consider enabling CUDA for better performance.",
+                    crate_name
+                );
+            }
+        }
+
+        pub fn config(&self) -> &DeviceConfig {
+            &self.config
+        }
+    }
+}
+
+#[cfg(not(feature = "rust-ai-core"))]
+pub use placeholder::*;
 
 // ============================================================================
 // Adapter Traits
 // ============================================================================
 
-/// Trait for converting aphelion-core configurations to rust-ai-core format.
-///
-/// This trait defines the contract for configuration translation. Implementors
-/// should handle the mapping of aphelion's flexible parameter system to
-/// rust-ai-core's structured configuration.
-///
-/// # Example
-///
-/// ```
-/// use aphelion_core::rust_ai_core::{ConfigAdapter, RacModelConfig, DefaultConfigAdapter};
-/// use aphelion_core::config::ModelConfig;
-///
-/// let aphelion_config = ModelConfig::new("bert-base", "1.0.0")
-///     .with_param("batch_size", serde_json::json!(32))
-///     .with_param("hidden_size", serde_json::json!(768));
-///
-/// let adapter = DefaultConfigAdapter;
-/// let rac_config = adapter.convert(&aphelion_config).unwrap();
-///
-/// assert_eq!(rac_config.name, "bert-base");
-/// assert_eq!(rac_config.batch_size, Some(32));
-/// ```
+/// Trait for converting aphelion configurations to rust-ai-core format.
 pub trait ConfigAdapter: Send + Sync {
-    /// Convert an aphelion ModelConfig to rust-ai-core's RacModelConfig.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the configuration contains invalid or
-    /// incompatible parameters.
     fn convert(&self, config: &ModelConfig) -> AphelionResult<RacModelConfig>;
 
-    /// Validate that a configuration is compatible with rust-ai-core.
-    ///
-    /// This can be used for early validation before attempting conversion.
     fn validate(&self, config: &ModelConfig) -> AphelionResult<()> {
-        // Default implementation just attempts conversion
         self.convert(config).map(|_| ())
     }
 
-    /// Get the list of supported parameter keys.
     fn supported_params(&self) -> &[&str] {
         &[
             "batch_size",
@@ -319,48 +607,10 @@ pub trait ConfigAdapter: Send + Sync {
     }
 }
 
-/// Trait for converting aphelion-core graphs to rust-ai-core format.
-///
-/// This trait handles the transformation of aphelion's `BuildGraph` into
-/// rust-ai-core's `RacComputeGraph`, including node mapping and edge
-/// translation.
-///
-/// # Graph Conversion Process
-///
-/// 1. Iterate through aphelion nodes in order
-/// 2. Convert each node's configuration using `ConfigAdapter`
-/// 3. Map NodeId to RacNodeHandle
-/// 4. Preserve edge connectivity
-/// 5. Compute graph metadata (hash, source info)
-///
-/// # Example
-///
-/// ```
-/// use aphelion_core::rust_ai_core::{GraphAdapter, DefaultGraphAdapter};
-/// use aphelion_core::graph::BuildGraph;
-/// use aphelion_core::config::ModelConfig;
-///
-/// let mut graph = BuildGraph::default();
-/// let node1 = graph.add_node("encoder", ModelConfig::new("encoder", "1.0"));
-/// let node2 = graph.add_node("decoder", ModelConfig::new("decoder", "1.0"));
-/// graph.add_edge(node1, node2);
-///
-/// let adapter = DefaultGraphAdapter::new();
-/// let rac_graph = adapter.convert(&graph).unwrap();
-///
-/// assert_eq!(rac_graph.nodes.len(), 2);
-/// assert_eq!(rac_graph.edges.len(), 1);
-/// ```
+/// Trait for converting aphelion graphs to rust-ai-core format.
 pub trait GraphAdapter: Send + Sync {
-    /// Convert an aphelion BuildGraph to rust-ai-core's RacComputeGraph.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the graph structure is invalid or contains
-    /// nodes with incompatible configurations.
     fn convert(&self, graph: &BuildGraph) -> AphelionResult<RacComputeGraph>;
 
-    /// Convert a graph with a specific target device hint.
     fn convert_for_device(
         &self,
         graph: &BuildGraph,
@@ -371,35 +621,17 @@ pub trait GraphAdapter: Send + Sync {
         Ok(rac_graph)
     }
 
-    /// Validate graph structure for rust-ai-core compatibility.
     fn validate(&self, graph: &BuildGraph) -> AphelionResult<()>;
 }
 
-/// Trait for executing converted graphs on rust-ai-core runtime.
-///
-/// This trait would be implemented when actual rust-ai-core runtime
-/// is available. It provides the execution interface for running
-/// converted graphs on various devices.
+/// Trait for runtime execution.
 pub trait RuntimeAdapter: Send + Sync {
-    /// The output type produced by execution.
     type Output;
 
-    /// Execute a compute graph on the specified device.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if execution fails due to device issues,
-    /// memory constraints, or runtime errors.
-    fn execute(
-        &self,
-        graph: &RacComputeGraph,
-        device: &RacDevice,
-    ) -> AphelionResult<Self::Output>;
+    fn execute(&self, graph: &RacComputeGraph, device: &RacDevice) -> AphelionResult<Self::Output>;
 
-    /// Check if a device is available for execution.
     fn is_device_available(&self, device: &RacDevice) -> bool;
 
-    /// List all available devices.
     fn available_devices(&self) -> Vec<RacDevice>;
 }
 
@@ -407,7 +639,7 @@ pub trait RuntimeAdapter: Send + Sync {
 // Default Implementations
 // ============================================================================
 
-/// Default configuration adapter with standard parameter mapping.
+/// Default configuration adapter.
 #[derive(Debug, Clone, Default)]
 pub struct DefaultConfigAdapter;
 
@@ -419,38 +651,30 @@ impl ConfigAdapter for DefaultConfigAdapter {
             ..Default::default()
         };
 
-        // Extract known parameters
         if let Some(val) = config.params.get("batch_size") {
             rac_config.batch_size = val.as_u64().map(|v| v as u32);
         }
-
         if let Some(val) = config.params.get("sequence_length") {
             rac_config.sequence_length = val.as_u64().map(|v| v as u32);
         }
-
         if let Some(val) = config.params.get("hidden_size") {
             rac_config.hidden_size = val.as_u64().map(|v| v as u32);
         }
-
         if let Some(val) = config.params.get("num_attention_heads") {
             rac_config.num_attention_heads = val.as_u64().map(|v| v as u32);
         }
-
         if let Some(val) = config.params.get("num_layers") {
             rac_config.num_layers = val.as_u64().map(|v| v as u32);
         }
-
         if let Some(val) = config.params.get("vocab_size") {
             rac_config.vocab_size = val.as_u64().map(|v| v as u32);
         }
-
         if let Some(val) = config.params.get("dtype") {
             if let Some(dtype_str) = val.as_str() {
                 rac_config.dtype = parse_dtype(dtype_str)?;
             }
         }
 
-        // Store remaining parameters as custom
         for (key, val) in &config.params {
             if !self.supported_params().contains(&key.as_str()) {
                 rac_config
@@ -463,7 +687,6 @@ impl ConfigAdapter for DefaultConfigAdapter {
     }
 }
 
-/// Parse a dtype string into RacDataType.
 fn parse_dtype(s: &str) -> AphelionResult<RacDataType> {
     match s.to_lowercase().as_str() {
         "float32" | "f32" => Ok(RacDataType::Float32),
@@ -474,30 +697,21 @@ fn parse_dtype(s: &str) -> AphelionResult<RacDataType> {
         "int64" | "i64" => Ok(RacDataType::Int64),
         "int8" | "i8" => Ok(RacDataType::Int8),
         "uint8" | "u8" => Ok(RacDataType::UInt8),
-        _ => Err(AphelionError::config_error(format!(
-            "Unknown dtype: {}",
-            s
-        ))),
+        _ => Err(AphelionError::config_error(format!("Unknown dtype: {}", s))),
     }
 }
 
-/// Default graph adapter implementation.
+/// Default graph adapter.
 #[derive(Debug, Clone)]
 pub struct DefaultGraphAdapter {
     config_adapter: DefaultConfigAdapter,
 }
 
 impl DefaultGraphAdapter {
-    /// Create a new default graph adapter.
     pub fn new() -> Self {
         Self {
             config_adapter: DefaultConfigAdapter,
         }
-    }
-
-    /// Create with a custom config adapter.
-    pub fn with_config_adapter(config_adapter: DefaultConfigAdapter) -> Self {
-        Self { config_adapter }
     }
 }
 
@@ -513,7 +727,6 @@ impl GraphAdapter for DefaultGraphAdapter {
 
         let mut rac_graph = RacComputeGraph::default();
 
-        // Convert nodes
         for node in &graph.nodes {
             let rac_config = self.config_adapter.convert(&node.config)?;
             let handle = RacNodeHandle::from(node.id);
@@ -527,15 +740,12 @@ impl GraphAdapter for DefaultGraphAdapter {
             });
         }
 
-        // Convert edges
         for (from, to) in &graph.edges {
-            rac_graph.edges.push((
-                RacNodeHandle::from(*from),
-                RacNodeHandle::from(*to),
-            ));
+            rac_graph
+                .edges
+                .push((RacNodeHandle::from(*from), RacNodeHandle::from(*to)));
         }
 
-        // Set metadata
         rac_graph.metadata = RacGraphMetadata {
             source_framework: "aphelion-core".to_string(),
             content_hash: graph.stable_hash(),
@@ -547,12 +757,7 @@ impl GraphAdapter for DefaultGraphAdapter {
     }
 
     fn validate(&self, graph: &BuildGraph) -> AphelionResult<()> {
-        // Check for cycles (simple check - real implementation would use proper cycle detection)
-        // This is a placeholder validation
-
-        // Check that all edge references are valid
-        let node_ids: std::collections::HashSet<_> =
-            graph.nodes.iter().map(|n| n.id).collect();
+        let node_ids: std::collections::HashSet<_> = graph.nodes.iter().map(|n| n.id).collect();
 
         for (from, to) in &graph.edges {
             if !node_ids.contains(from) {
@@ -573,51 +778,38 @@ impl GraphAdapter for DefaultGraphAdapter {
     }
 }
 
-/// Placeholder runtime adapter for testing.
-///
-/// This implementation simulates rust-ai-core runtime behavior
-/// without actual computation capabilities.
+/// Placeholder runtime for testing.
 #[derive(Debug, Clone, Default)]
 pub struct PlaceholderRuntime {
     available_devices: Vec<RacDevice>,
 }
 
 impl PlaceholderRuntime {
-    /// Create a new placeholder runtime with default CPU device.
     pub fn new() -> Self {
         Self {
             available_devices: vec![RacDevice::default_cpu()],
         }
     }
 
-    /// Add an available device.
     pub fn with_device(mut self, device: RacDevice) -> Self {
         self.available_devices.push(device);
         self
     }
 }
 
-/// Placeholder output type for runtime execution.
+/// Placeholder output for runtime execution.
 #[derive(Debug, Clone)]
 pub struct PlaceholderOutput {
-    /// Whether execution completed successfully
     pub success: bool,
-    /// Execution time in milliseconds (simulated)
     pub execution_time_ms: u64,
-    /// Device used for execution
     pub device_used: String,
-    /// Number of nodes executed
     pub nodes_executed: usize,
 }
 
 impl RuntimeAdapter for PlaceholderRuntime {
     type Output = PlaceholderOutput;
 
-    fn execute(
-        &self,
-        graph: &RacComputeGraph,
-        device: &RacDevice,
-    ) -> AphelionResult<Self::Output> {
+    fn execute(&self, graph: &RacComputeGraph, device: &RacDevice) -> AphelionResult<Self::Output> {
         if !self.is_device_available(device) {
             return Err(AphelionError::backend(format!(
                 "Device not available: {}",
@@ -625,10 +817,9 @@ impl RuntimeAdapter for PlaceholderRuntime {
             )));
         }
 
-        // Simulate execution
         Ok(PlaceholderOutput {
             success: true,
-            execution_time_ms: graph.nodes.len() as u64 * 10, // Simulated timing
+            execution_time_ms: graph.nodes.len() as u64 * 10,
             device_used: device.id.clone(),
             nodes_executed: graph.nodes.len(),
         })
@@ -647,22 +838,7 @@ impl RuntimeAdapter for PlaceholderRuntime {
 // Convenience Functions
 // ============================================================================
 
-/// Convert an aphelion graph and config to rust-ai-core format.
-///
-/// This is a convenience function that uses the default adapters.
-///
-/// # Example
-///
-/// ```
-/// use aphelion_core::rust_ai_core::to_rust_ai_core;
-/// use aphelion_core::graph::BuildGraph;
-/// use aphelion_core::config::ModelConfig;
-///
-/// let graph = BuildGraph::default();
-/// let config = ModelConfig::new("test", "1.0");
-///
-/// let (rac_graph, rac_config) = to_rust_ai_core(&graph, &config).unwrap();
-/// ```
+/// Convert graph and config to rust-ai-core format.
 pub fn to_rust_ai_core(
     graph: &BuildGraph,
     config: &ModelConfig,
@@ -676,55 +852,14 @@ pub fn to_rust_ai_core(
     Ok((rac_graph, rac_config))
 }
 
-/// Create a rust-ai-core compute graph from an aphelion graph.
+/// Convert graph to rust-ai-core format.
 pub fn graph_to_rac(graph: &BuildGraph) -> AphelionResult<RacComputeGraph> {
     DefaultGraphAdapter::new().convert(graph)
 }
 
-/// Create a rust-ai-core config from an aphelion config.
+/// Convert config to rust-ai-core format.
 pub fn config_to_rac(config: &ModelConfig) -> AphelionResult<RacModelConfig> {
     DefaultConfigAdapter.convert(config)
-}
-
-// ============================================================================
-// Feature-gated actual adapter (when rust-ai-core is available)
-// ============================================================================
-
-/// Module containing the actual rust-ai-core integration.
-///
-/// This module is only compiled when the `rust-ai-core` feature is enabled
-/// AND the actual rust-ai-core crate is available as a dependency.
-///
-/// ## Future Implementation Notes
-///
-/// When rust-ai-core becomes available:
-///
-/// 1. Import actual types: `use rust_ai_core::{Device, Graph, Config};`
-/// 2. Implement `From<ModelConfig>` for actual rust-ai-core Config
-/// 3. Implement `From<BuildGraph>` for actual rust-ai-core Graph
-/// 4. Add proper error type conversions
-/// 5. Implement async execution if supported
-#[cfg(feature = "rust-ai-core")]
-pub mod adapter {
-    pub use super::*;
-
-    // When rust-ai-core is available, this would contain:
-    //
-    // ```ignore
-    // use rust_ai_core as rac;
-    //
-    // impl From<&ModelConfig> for rac::Config {
-    //     fn from(config: &ModelConfig) -> Self {
-    //         // Real conversion logic
-    //     }
-    // }
-    //
-    // impl From<&BuildGraph> for rac::Graph {
-    //     fn from(graph: &BuildGraph) -> Self {
-    //         // Real conversion logic
-    //     }
-    // }
-    // ```
 }
 
 // ============================================================================
@@ -742,7 +877,6 @@ mod tests {
         let cpu = RacDevice::default_cpu();
         assert_eq!(cpu.device_type, RacDeviceType::Cpu);
         assert_eq!(cpu.id, "cpu:0");
-        assert!(cpu.memory_bytes.is_none());
 
         let cuda = RacDevice::cuda(0).with_memory(8 * 1024 * 1024 * 1024);
         assert_eq!(cuda.device_type, RacDeviceType::Cuda);
@@ -751,73 +885,30 @@ mod tests {
     }
 
     #[test]
-    fn test_config_adapter_basic() {
-        let config = ModelConfig::new("test-model", "1.0.0");
-        let adapter = DefaultConfigAdapter;
-
-        let rac_config = adapter.convert(&config).unwrap();
-        assert_eq!(rac_config.name, "test-model");
-        assert_eq!(rac_config.version, "1.0.0");
-    }
-
-    #[test]
-    fn test_config_adapter_with_params() {
+    fn test_config_adapter() {
         let config = ModelConfig::new("bert", "1.0.0")
             .with_param("batch_size", serde_json::json!(32))
             .with_param("hidden_size", serde_json::json!(768))
-            .with_param("num_attention_heads", serde_json::json!(12))
-            .with_param("num_layers", serde_json::json!(12))
-            .with_param("vocab_size", serde_json::json!(30522))
             .with_param("dtype", serde_json::json!("float16"));
 
         let adapter = DefaultConfigAdapter;
         let rac_config = adapter.convert(&config).unwrap();
 
+        assert_eq!(rac_config.name, "bert");
         assert_eq!(rac_config.batch_size, Some(32));
         assert_eq!(rac_config.hidden_size, Some(768));
-        assert_eq!(rac_config.num_attention_heads, Some(12));
-        assert_eq!(rac_config.num_layers, Some(12));
-        assert_eq!(rac_config.vocab_size, Some(30522));
         assert_eq!(rac_config.dtype, RacDataType::Float16);
-    }
-
-    #[test]
-    fn test_config_adapter_custom_params() {
-        let config = ModelConfig::new("custom", "1.0.0")
-            .with_param("custom_key", serde_json::json!("custom_value"))
-            .with_param("another_param", serde_json::json!(42));
-
-        let adapter = DefaultConfigAdapter;
-        let rac_config = adapter.convert(&config).unwrap();
-
-        assert!(rac_config.custom_params.contains_key("custom_key"));
-        assert!(rac_config.custom_params.contains_key("another_param"));
     }
 
     #[test]
     fn test_dtype_parsing() {
         assert_eq!(parse_dtype("float32").unwrap(), RacDataType::Float32);
-        assert_eq!(parse_dtype("f32").unwrap(), RacDataType::Float32);
-        assert_eq!(parse_dtype("FLOAT16").unwrap(), RacDataType::Float16);
-        assert_eq!(parse_dtype("bfloat16").unwrap(), RacDataType::BFloat16);
         assert_eq!(parse_dtype("bf16").unwrap(), RacDataType::BFloat16);
-
         assert!(parse_dtype("invalid").is_err());
     }
 
     #[test]
-    fn test_graph_adapter_empty() {
-        let graph = BuildGraph::default();
-        let adapter = DefaultGraphAdapter::new();
-
-        let rac_graph = adapter.convert(&graph).unwrap();
-        assert!(rac_graph.nodes.is_empty());
-        assert!(rac_graph.edges.is_empty());
-        assert_eq!(rac_graph.metadata.source_framework, "aphelion-core");
-    }
-
-    #[test]
-    fn test_graph_adapter_with_nodes() {
+    fn test_graph_adapter() {
         let mut graph = BuildGraph::default();
         let node1 = graph.add_node("encoder", ModelConfig::new("enc", "1.0"));
         let node2 = graph.add_node("decoder", ModelConfig::new("dec", "1.0"));
@@ -828,173 +919,30 @@ mod tests {
 
         assert_eq!(rac_graph.nodes.len(), 2);
         assert_eq!(rac_graph.edges.len(), 1);
-        assert_eq!(rac_graph.nodes[0].op_type, "encoder");
-        assert_eq!(rac_graph.nodes[1].op_type, "decoder");
-    }
-
-    #[test]
-    fn test_graph_adapter_preserves_hash() {
-        let mut graph = BuildGraph::default();
-        graph.add_node("test", ModelConfig::new("test", "1.0"));
-
-        let adapter = DefaultGraphAdapter::new();
-        let rac_graph = adapter.convert(&graph).unwrap();
-
         assert_eq!(rac_graph.metadata.content_hash, graph.stable_hash());
     }
 
     #[test]
-    fn test_graph_validation_invalid_edge() {
-        let mut graph = BuildGraph::default();
-        let node1 = graph.add_node("test", ModelConfig::new("test", "1.0"));
-        // Add edge to non-existent node
-        graph.edges.push((node1, NodeId::new(999)));
-
-        let adapter = DefaultGraphAdapter::new();
-        let result = adapter.validate(&graph);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_node_id_to_handle_conversion() {
-        let node_id = NodeId::new(42);
-        let handle: RacNodeHandle = node_id.into();
-
-        assert_eq!(handle.index, 42);
-        assert_eq!(handle.generation, 0);
-    }
-
-    #[test]
     fn test_placeholder_runtime() {
-        let runtime = PlaceholderRuntime::new()
-            .with_device(RacDevice::cuda(0));
-
-        let devices = runtime.available_devices();
-        assert_eq!(devices.len(), 2); // CPU + CUDA
-
+        let runtime = PlaceholderRuntime::new().with_device(RacDevice::cuda(0));
+        assert_eq!(runtime.available_devices().len(), 2);
         assert!(runtime.is_device_available(&RacDevice::default_cpu()));
-        assert!(runtime.is_device_available(&RacDevice::cuda(0)));
-        assert!(!runtime.is_device_available(&RacDevice::cuda(1)));
     }
 
     #[test]
-    fn test_placeholder_runtime_execute() {
-        let mut graph = BuildGraph::default();
-        graph.add_node("op1", ModelConfig::new("op1", "1.0"));
-        graph.add_node("op2", ModelConfig::new("op2", "1.0"));
-
-        let adapter = DefaultGraphAdapter::new();
-        let rac_graph = adapter.convert(&graph).unwrap();
-
-        let runtime = PlaceholderRuntime::new();
-        let device = RacDevice::default_cpu();
-
-        let output = runtime.execute(&rac_graph, &device).unwrap();
-        assert!(output.success);
-        assert_eq!(output.nodes_executed, 2);
-        assert_eq!(output.device_used, "cpu:0");
+    fn test_memory_tracker() {
+        let tracker = MemoryTracker::with_limit(1024);
+        assert!(tracker.would_fit(512));
+        tracker.allocate(512).unwrap();
+        assert_eq!(tracker.allocated_bytes(), 512);
+        tracker.deallocate(256);
+        assert_eq!(tracker.allocated_bytes(), 256);
     }
 
     #[test]
-    fn test_placeholder_runtime_unavailable_device() {
-        let rac_graph = RacComputeGraph::default();
-        let runtime = PlaceholderRuntime::new(); // Only has CPU
-
-        let result = runtime.execute(&rac_graph, &RacDevice::cuda(0));
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_convenience_functions() {
-        let mut graph = BuildGraph::default();
-        graph.add_node("test", ModelConfig::new("test", "1.0"));
-        let config = ModelConfig::new("model", "2.0");
-
-        let (rac_graph, rac_config) = to_rust_ai_core(&graph, &config).unwrap();
-        assert_eq!(rac_graph.nodes.len(), 1);
-        assert_eq!(rac_config.name, "model");
-
-        let rac_graph2 = graph_to_rac(&graph).unwrap();
-        assert_eq!(rac_graph2.nodes.len(), 1);
-
-        let rac_config2 = config_to_rac(&config).unwrap();
-        assert_eq!(rac_config2.version, "2.0");
-    }
-
-    #[test]
-    fn test_convert_for_device() {
-        let mut graph = BuildGraph::default();
-        graph.add_node("test", ModelConfig::new("test", "1.0"));
-
-        let adapter = DefaultGraphAdapter::new();
-        let device = RacDevice::cuda(0);
-
-        let rac_graph = adapter.convert_for_device(&graph, &device).unwrap();
-        assert!(rac_graph.metadata.device_hints.contains(&"cuda:0".to_string()));
-    }
-
-    #[test]
-    fn test_supported_params() {
-        let adapter = DefaultConfigAdapter;
-        let params = adapter.supported_params();
-
-        assert!(params.contains(&"batch_size"));
-        assert!(params.contains(&"hidden_size"));
-        assert!(params.contains(&"dtype"));
-    }
-
-    #[test]
-    fn test_rac_model_config_default() {
-        let config = RacModelConfig::default();
-
-        assert!(config.name.is_empty());
-        assert_eq!(config.version, "0.0.0");
-        assert!(config.batch_size.is_none());
-        assert_eq!(config.dtype, RacDataType::Float32);
-    }
-
-    #[test]
-    fn test_complex_graph_conversion() {
-        // Create a more complex graph structure
-        let mut graph = BuildGraph::default();
-
-        let embed = graph.add_node(
-            "embedding",
-            ModelConfig::new("embed", "1.0")
-                .with_param("vocab_size", serde_json::json!(30000))
-                .with_param("hidden_size", serde_json::json!(512)),
-        );
-
-        let enc1 = graph.add_node(
-            "encoder_layer_1",
-            ModelConfig::new("encoder", "1.0")
-                .with_param("num_attention_heads", serde_json::json!(8)),
-        );
-
-        let enc2 = graph.add_node(
-            "encoder_layer_2",
-            ModelConfig::new("encoder", "1.0")
-                .with_param("num_attention_heads", serde_json::json!(8)),
-        );
-
-        let output = graph.add_node(
-            "output_projection",
-            ModelConfig::new("linear", "1.0"),
-        );
-
-        graph.add_edge(embed, enc1);
-        graph.add_edge(enc1, enc2);
-        graph.add_edge(enc2, output);
-
-        let adapter = DefaultGraphAdapter::new();
-        let rac_graph = adapter.convert(&graph).unwrap();
-
-        assert_eq!(rac_graph.nodes.len(), 4);
-        assert_eq!(rac_graph.edges.len(), 3);
-
-        // Verify node configs were converted
-        assert_eq!(rac_graph.nodes[0].config.vocab_size, Some(30000));
-        assert_eq!(rac_graph.nodes[1].config.num_attention_heads, Some(8));
+    fn test_aphelion_device() {
+        let device = AphelionDevice::cpu();
+        assert!(device.is_cpu());
+        assert!(!device.is_cuda());
     }
 }

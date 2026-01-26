@@ -75,16 +75,13 @@ impl ToyModel {
 }
 
 pub fn build_with_pipeline(model: &ToyModel, backend: &dyn Backend, trace: &dyn TraceSink) {
-    let ctx = BuildContext { backend, trace };
+    let ctx = BuildContext::new(backend, trace);
     let _ = BuildPipeline::build(model, ctx);
 }
 
 pub fn build_with_validation(model: &ToyModel) {
     let backend = NullBackend::cpu();
     let trace = aphelion_core::diagnostics::InMemoryTraceSink::new();
-    let ctx = BuildContext {
-        backend: &backend,
-        trace: &trace,
-    };
+    let ctx = BuildContext::new(&backend, &trace);
     let _ = BuildPipeline::build_with_validation(model, ctx);
 }

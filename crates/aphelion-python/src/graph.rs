@@ -68,7 +68,9 @@ impl PyGraphNode {
 
     #[getter]
     fn id(&self) -> PyNodeId {
-        PyNodeId { inner: self.inner.id }
+        PyNodeId {
+            inner: self.inner.id,
+        }
     }
 
     #[getter]
@@ -78,7 +80,9 @@ impl PyGraphNode {
 
     #[getter]
     fn config(&self) -> PyModelConfig {
-        PyModelConfig { inner: self.inner.config.clone() }
+        PyModelConfig {
+            inner: self.inner.config.clone(),
+        }
     }
 
     /// Get metadata as a Python dict.
@@ -87,7 +91,10 @@ impl PyGraphNode {
         pythonize::pythonize(py, &self.inner.metadata)
             .map(|bound| bound.unbind())
             .map_err(|e| {
-                pyo3::exceptions::PyValueError::new_err(format!("Failed to convert metadata: {}", e))
+                pyo3::exceptions::PyValueError::new_err(format!(
+                    "Failed to convert metadata: {}",
+                    e
+                ))
             })
     }
 

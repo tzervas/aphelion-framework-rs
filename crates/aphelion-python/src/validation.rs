@@ -2,8 +2,10 @@
 
 use pyo3::prelude::*;
 
-use aphelion_core::validation::{ConfigValidator, NameValidator, ValidationError, VersionValidator};
 use crate::config::PyModelConfig;
+use aphelion_core::validation::{
+    ConfigValidator, NameValidator, ValidationError, VersionValidator,
+};
 
 /// Validation error with field and message.
 #[pyclass(name = "ValidationError")]
@@ -32,7 +34,10 @@ impl PyValidationError {
     }
 
     fn __repr__(&self) -> String {
-        format!("ValidationError(field='{}', message='{}')", self.inner.field, self.inner.message)
+        format!(
+            "ValidationError(field='{}', message='{}')",
+            self.inner.field, self.inner.message
+        )
     }
 
     fn __str__(&self) -> String {
@@ -54,7 +59,10 @@ impl PyNameValidator {
     fn validate(&self, config: &PyModelConfig) -> Vec<PyValidationError> {
         match NameValidator.validate(&config.inner) {
             Ok(()) => Vec::new(),
-            Err(errors) => errors.into_iter().map(|e| PyValidationError { inner: e }).collect(),
+            Err(errors) => errors
+                .into_iter()
+                .map(|e| PyValidationError { inner: e })
+                .collect(),
         }
     }
 
@@ -77,7 +85,10 @@ impl PyVersionValidator {
     fn validate(&self, config: &PyModelConfig) -> Vec<PyValidationError> {
         match VersionValidator.validate(&config.inner) {
             Ok(()) => Vec::new(),
-            Err(errors) => errors.into_iter().map(|e| PyValidationError { inner: e }).collect(),
+            Err(errors) => errors
+                .into_iter()
+                .map(|e| PyValidationError { inner: e })
+                .collect(),
         }
     }
 
@@ -96,7 +107,9 @@ pub struct PyCompositeValidator {
 impl PyCompositeValidator {
     #[new]
     fn new() -> Self {
-        Self { validators: Vec::new() }
+        Self {
+            validators: Vec::new(),
+        }
     }
 
     fn with_name_validator(&self) -> Self {
