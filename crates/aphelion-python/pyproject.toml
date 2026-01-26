@@ -4,7 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "aphelion-framework"
-version = "1.2.2"
+# Version is read dynamically from Cargo.toml by maturin
+dynamic = ["version"]
 description = "Python bindings for the Aphelion AI Framework - unified frontend for AI model development"
 readme = "README.md"
 license = { text = "MIT OR Apache-2.0" }

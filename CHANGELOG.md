@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-01-26
+
+### Fixed
+- Python package now uses dynamic versioning from Cargo.toml (was stuck at 1.2.2)
+- PyPI releases will now match crates.io versions automatically
+
 ## [1.2.5] - 2026-01-26
 
 ### Changed

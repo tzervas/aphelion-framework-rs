@@ -695,6 +695,7 @@ Example output from tritter_demo:
 
 | Version | Features |
 |---------|----------|
+| 1.2.6 | Fix: Python package now uses dynamic versioning from Cargo.toml |
 | 1.2.5 | Dependency updates: burn 0.20.1, pyo3 0.27.2, thiserror 2.0.18, half 2.7.1 |
 | 1.2.4 | Security: Replaced unmaintained `paste`/`gemm` with maintained forks. See [SECURITY.md](SECURITY.md#unmaintained-dependency-mitigation) |
 | 1.2.3 | Documentation updates for dependency tracking |
