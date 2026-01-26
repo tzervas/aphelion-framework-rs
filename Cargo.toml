@@ -50,3 +50,8 @@ pyo3-async-runtimes = "0.27"
 # Internal crates (path for dev, version for release)
 aphelion-macros = { version = "1.2.2", path = "crates/aphelion-macros" }
 aphelion-core = { version = "1.2.2", path = "crates/aphelion-core" }
+
+# Patch unmaintained paste crate with maintained fork
+# Requires patch-target branch in qlora-paste with name = "paste"
+[patch.crates-io]
+paste = { git = "https://github.com/tzervas/qlora-paste", branch = "patch-target" }
