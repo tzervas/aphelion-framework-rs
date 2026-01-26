@@ -7,6 +7,10 @@ authors = { workspace = true }
 repository = { workspace = true }
 publish = false
 
+[features]
+default = []
+tritter-accel = ["aphelion-core/tritter-accel"]
+
 [dependencies]
 aphelion-core = { path = "../aphelion-core" }
 serde_json = { workspace = true }

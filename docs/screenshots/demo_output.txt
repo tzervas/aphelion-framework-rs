@@ -1,0 +1,28 @@
+═══════════════════════════════════════════════════════════════
+                 Aphelion Framework Demo
+═══════════════════════════════════════════════════════════════
+
+📋 Model Configuration:
+   Name: transformer
+   Version: 1.0.0
+   d_model = 512
+   dropout = 0.1
+   n_heads = 8
+   n_layers = 6
+
+🔷 Build Graph:
+   Nodes: 2
+   Edges: 1
+   Hash: c42707e03af1b7e4baf61a94150b1541513ffe220641273d9adabe504d7dc89e
+
+⚙️  Backend: null (cpu)
+
+✅ Pipeline Execution Complete
+   Final Hash: c42707e03af1b7e4baf61a94150b1541513ffe220641273d9adabe504d7dc89e
+   Trace Events: 2
+
+📊 Trace Events:
+   [Info] stage.validation - validated 2 nodes
+   [Info] stage.hashing - computed graph hash: c42707e03af1b7e4baf61a94150b1541513ffe220641273d9adabe504d7dc89e
+
+═══════════════════════════════════════════════════════════════
