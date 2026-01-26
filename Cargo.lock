@@ -4491,9 +4491,9 @@ dependencies = [
 
 [[package]]
 name = "qlora-paste"
-version = "1.0.17"
+version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22e3fda8165e1f24788d08ae7919aa49e4deb4584afa48fc1e70aeb997905eb4"
+checksum = "daa4ab9c7f8287fce458ee9be80596b25c0aa5b2c8a08eea564e2c58d7ecef52"
 
 [[package]]
 name = "qoi"
