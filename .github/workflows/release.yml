@@ -28,6 +28,8 @@ jobs:
         run: cargo test --workspace
 
   # Validate crates can be published (dry-run)
+  # Note: Only validate aphelion-macros since aphelion-core depends on it
+  # and dry-run can't resolve workspace deps that aren't published yet
   validate-publish:
     name: Validate Publish
     needs: test
@@ -46,8 +48,11 @@ jobs:
       - name: Validate aphelion-macros (dry-run)
         run: cargo publish -p aphelion-macros --dry-run
 
-      - name: Validate aphelion-core (dry-run)
-        run: cargo publish -p aphelion-core --dry-run
+      # Skip dry-run for aphelion-core - it depends on aphelion-macros which
+      # won't be on crates.io until publish. The actual publish handles this
+      # by publishing macros first, waiting for index, then publishing core.
+      - name: Verify aphelion-core builds
+        run: cargo build -p aphelion-core --release
 
   # Create GitHub Release
   github-release:
