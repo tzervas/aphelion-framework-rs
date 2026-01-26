@@ -42,6 +42,7 @@ cubecl = "0.9"
 rust-ai-core = "0.2.7"
 candle-core = "0.9"
 half = "2.7"
+qlora-gemm = "0.20.0"
 
 # Python bindings
 pyo3 = "0.27"
@@ -52,7 +53,8 @@ pyo3-async-runtimes = "0.27"
 aphelion-macros = { version = "1.2.3", path = "crates/aphelion-macros" }
 aphelion-core = { version = "1.2.3", path = "crates/aphelion-core" }
 
-# Patch unmaintained paste crate with maintained qlora-paste fork
-# TODO: Uncomment when 'as-paste' branch exists with name = "paste" in Cargo.toml
+# Patch unmaintained crates with maintained qlora-* forks
+# TODO: Uncomment when 'as-*' branches exist with original names in Cargo.toml
 # [patch.crates-io]
 # paste = { git = "https://github.com/tzervas/qlora-paste", branch = "as-paste" }
+# gemm = { git = "https://github.com/tzervas/qlora-gemm", branch = "as-gemm" }
