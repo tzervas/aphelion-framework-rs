@@ -1,0 +1,92 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  schedule:
+    # Run weekly on Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write  # Required for SARIF upload
+
+jobs:
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Generate SARIF report
+        run: |
+          cargo audit --json > audit-results.json || true
+          # Convert to SARIF format for GitHub Security tab
+          cargo audit --json 2>/dev/null | jq '{
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [{
+              "tool": {
+                "driver": {
+                  "name": "cargo-audit",
+                  "informationUri": "https://github.com/rustsec/rustsec",
+                  "rules": []
+                }
+              },
+              "results": [.vulnerabilities.list[]? | {
+                "ruleId": .advisory.id,
+                "message": { "text": .advisory.title },
+                "level": (if .advisory.severity == "critical" then "error" elif .advisory.severity == "high" then "error" else "warning" end),
+                "locations": [{
+                  "physicalLocation": {
+                    "artifactLocation": { "uri": "Cargo.lock" }
+                  }
+                }]
+              }]
+            }]
+          }' > cargo-audit-results.sarif || echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","runs":[{"tool":{"driver":{"name":"cargo-audit"}},"results":[]}]}' > cargo-audit-results.sarif
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: cargo-audit-results.sarif
+          category: cargo-audit
+        if: always()
+
+      - name: Run cargo-audit (fail on vulnerabilities)
+        run: cargo audit --deny warnings
+
+  deny:
+    name: Cargo Deny
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@cargo-deny
+
+      - name: Check advisories
+        run: cargo deny check advisories
+
+      - name: Check licenses
+        run: cargo deny check licenses
+
+      - name: Check bans
+        run: cargo deny check bans
