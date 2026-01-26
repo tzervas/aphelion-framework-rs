@@ -29,7 +29,7 @@ sha2 = { workspace = true }
 hex = { workspace = true }
 tokio = { workspace = true, optional = true }
 
-aphelion-macros = { version = "1.1.0", path = "../aphelion-macros" }
+aphelion-macros = { version = "1.2.0", path = "../aphelion-macros" }
 
 # Ecosystem dependencies
 # burn = { version = "0.16", optional = true }

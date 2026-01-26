@@ -4,15 +4,15 @@ build-backend = "maturin"
 
 [project]
 name = "aphelion-framework"
-version = "1.1.0"
-description = "Python bindings for the Aphelion AI Framework (aphelion-framework-rs)"
+version = "1.2.0"
+description = "Python bindings for the Aphelion AI Framework - transparent, traceable AI model construction"
 readme = "README.md"
 license = { text = "MIT OR Apache-2.0" }
 requires-python = ">=3.9"
 authors = [
-    { name = "Aphelion Contributors" }
+    { name = "Tyler Zervas", email = "tz-dev@vectorweight.com" }
 ]
-keywords = ["ai", "machine-learning", "deep-learning", "framework", "rust"]
+keywords = ["ai", "machine-learning", "deep-learning", "framework", "rust", "gpu", "cuda"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -42,6 +42,10 @@ dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
     "mypy>=1.0",
+]
+# Optional rust-ai-core integration for memory tracking, device detection, etc.
+core = [
+    "rust-ai-core>=0.2.5",
 ]
 
 [tool.maturin]
