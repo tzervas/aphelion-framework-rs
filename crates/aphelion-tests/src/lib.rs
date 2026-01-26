@@ -621,7 +621,7 @@ mod tests {
         assert_eq!(*counter.lock().unwrap(), 1);
 
         // Both sinks should have recorded the test event
-        assert!(memory_sink.events().len() >= 1);
+        assert!(!memory_sink.events().is_empty());
         let json = exporter.to_json();
         assert!(!json.is_empty());
         assert_ne!(json, "[]", "JSON should contain events");
@@ -688,7 +688,7 @@ mod tests {
 
         let config1 = ModelConfig::new("model1", "1.0.0")
             .with_param("int_param", serde_json::json!(42))
-            .with_param("float_param", serde_json::json!(3.14))
+            .with_param("float_param", serde_json::json!(1.234))
             .with_param("string_param", serde_json::json!("value"))
             .with_param("bool_param", serde_json::json!(true));
 
@@ -1392,8 +1392,8 @@ mod tests {
             let mut nodes2 = Vec::new();
 
             for (i, config) in configs.iter().enumerate() {
-                let n1 = graph1.add_node(&format!("node_{}", i), config.clone());
-                let n2 = graph2.add_node(&format!("node_{}", i), config.clone());
+                let n1 = graph1.add_node(format!("node_{}", i), config.clone());
+                let n2 = graph2.add_node(format!("node_{}", i), config.clone());
                 nodes1.push(n1);
                 nodes2.push(n2);
 
@@ -1503,7 +1503,7 @@ mod tests {
     fn property_hash_length_consistent() {
         // Property: Hash length is always 64 hex characters (SHA256)
         for i in 0..100 {
-            let config = ModelConfig::new(&format!("model-{}", i), "1.0.0")
+            let config = ModelConfig::new(format!("model-{}", i), "1.0.0")
                 .with_param("iteration", serde_json::json!(i));
 
             let mut graph = BuildGraph::default();
@@ -1594,7 +1594,7 @@ mod tests {
                             id: format!("t{}-l{}", thread_id, i),
                             message: format!("Level {:?} from thread {}", level, thread_id),
                             timestamp: SystemTime::now(),
-                            level: level.clone(),
+                            level: *level,
                             span_id: None,
                             trace_id: None,
                         };
@@ -1985,7 +1985,7 @@ mod tests {
                 _ctx: &BuildContext,
                 _graph: &mut BuildGraph,
             ) -> aphelion_core::error::AphelionResult<()> {
-                Err(aphelion_core::error::AphelionError::build(&format!(
+                Err(aphelion_core::error::AphelionError::build(format!(
                     "Stage '{}' failed: resource exhausted",
                     self.name
                 )))

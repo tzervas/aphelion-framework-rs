@@ -1,4 +1,7 @@
 //! Python bindings for diagnostics.
+//!
+//! Structured tracing for pipeline execution. Events are typed and timestamped
+//! for reliable debugging and observability.
 
 use pyo3::prelude::*;
 use std::sync::Arc;
@@ -6,7 +9,16 @@ use std::time::SystemTime;
 
 use aphelion_core::diagnostics::{InMemoryTraceSink, TraceEvent, TraceLevel, TraceSink};
 
-/// Trace severity level.
+/// Severity level for trace events.
+///
+/// Levels follow standard logging conventions:
+/// - Debug: Detailed diagnostic information
+/// - Info: Normal operational events
+/// - Warn: Potentially problematic situations
+/// - Error: Failures that may require attention
+///
+/// Example:
+///     >>> event = TraceEvent("stage.start", "Starting validation", TraceLevel.Info)
 #[pyclass(name = "TraceLevel", eq, eq_int)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PyTraceLevel {
@@ -38,7 +50,28 @@ impl From<TraceLevel> for PyTraceLevel {
     }
 }
 
-/// Structured trace event.
+/// Structured trace event with timestamp and metadata.
+///
+/// TraceEvents capture diagnostic information during pipeline execution.
+/// Each event has:
+/// - id: Unique identifier (e.g., "stage.validation.start")
+/// - message: Human-readable description
+/// - level: Severity (Debug, Info, Warn, Error)
+/// - timestamp: When the event occurred
+/// - Optional span_id/trace_id for distributed tracing
+///
+/// Example:
+///     >>> event = TraceEvent("model.init", "Initializing encoder")
+///     >>> event.level
+///     TraceLevel.Info
+///
+/// Attributes:
+///     id (str): Event identifier for filtering and grouping.
+///     message (str): Human-readable description.
+///     level (TraceLevel): Severity level.
+///     span_id (str | None): Optional span ID for distributed tracing.
+///     trace_id (str | None): Optional trace ID for distributed tracing.
+///     timestamp_secs (float): Unix timestamp when event was created.
 #[pyclass(name = "TraceEvent")]
 #[derive(Clone)]
 pub struct PyTraceEvent {
@@ -47,8 +80,17 @@ pub struct PyTraceEvent {
 
 #[pymethods]
 impl PyTraceEvent {
+    /// Create a trace event.
+    ///
+    /// Args:
+    ///     id: Event identifier (e.g., "stage.validation.start").
+    ///     message: Human-readable description.
+    ///     level: Severity level (default: Info).
+    ///     span_id: Optional span ID for distributed tracing.
+    ///     trace_id: Optional trace ID for distributed tracing.
     #[new]
     #[pyo3(signature = (id, message, level=None, span_id=None, trace_id=None))]
+    #[pyo3(text_signature = "(id, message, level=None, span_id=None, trace_id=None)")]
     fn new(
         id: String,
         message: String,
@@ -68,31 +110,37 @@ impl PyTraceEvent {
         }
     }
 
+    /// Event identifier.
     #[getter]
     fn id(&self) -> &str {
         &self.inner.id
     }
 
+    /// Human-readable message.
     #[getter]
     fn message(&self) -> &str {
         &self.inner.message
     }
 
+    /// Severity level.
     #[getter]
     fn level(&self) -> PyTraceLevel {
         self.inner.level.into()
     }
 
+    /// Optional span ID for distributed tracing.
     #[getter]
     fn span_id(&self) -> Option<&str> {
         self.inner.span_id.as_deref()
     }
 
+    /// Optional trace ID for distributed tracing.
     #[getter]
     fn trace_id(&self) -> Option<&str> {
         self.inner.trace_id.as_deref()
     }
 
+    /// Unix timestamp (seconds since epoch).
     #[getter]
     fn timestamp_secs(&self) -> f64 {
         self.inner
@@ -110,7 +158,27 @@ impl PyTraceEvent {
     }
 }
 
-/// In-memory trace sink that collects events.
+/// In-memory storage for trace events.
+///
+/// Collects events during pipeline execution for later analysis. Thread-safe
+/// and shareable across pipeline stages.
+///
+/// Why in-memory:
+/// - Zero external dependencies (no logging framework required)
+/// - Complete event capture for debugging
+/// - Export to JSON for external analysis tools
+///
+/// For production, consider forwarding events to your observability system
+/// after pipeline completion.
+///
+/// Example:
+///     >>> trace = InMemoryTraceSink()
+///     >>> trace.record(TraceEvent("test", "hello"))
+///     >>> len(trace)
+///     1
+///     >>> for event in trace.events():
+///     ...     print(event.message)
+///     hello
 #[pyclass(name = "InMemoryTraceSink")]
 #[derive(Clone)]
 pub struct PyInMemoryTraceSink {
@@ -119,6 +187,7 @@ pub struct PyInMemoryTraceSink {
 
 #[pymethods]
 impl PyInMemoryTraceSink {
+    /// Create an empty trace sink.
     #[new]
     fn new() -> Self {
         Self {
@@ -126,10 +195,19 @@ impl PyInMemoryTraceSink {
         }
     }
 
+    /// Record a trace event.
+    ///
+    /// Args:
+    ///     event: TraceEvent to record.
+    #[pyo3(text_signature = "(event)")]
     fn record(&self, event: &PyTraceEvent) {
         self.inner.record(event.inner.clone());
     }
 
+    /// Get all recorded events.
+    ///
+    /// Returns:
+    ///     List of all TraceEvents in recording order.
     fn events(&self) -> Vec<PyTraceEvent> {
         self.inner
             .events()

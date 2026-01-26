@@ -1,20 +1,21 @@
 [package]
 name = "aphelion-core"
-version = { workspace = true }
-edition = { workspace = true }
-license = { workspace = true }
-authors = { workspace = true }
-repository = { workspace = true }
-description = "Core library for Aphelion AI pipeline framework - graphs, configs, pipelines, backends, diagnostics"
-keywords = { workspace = true }
-categories = { workspace = true }
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Core library for Aphelion AI framework - unified frontend for AI model development"
+keywords.workspace = true
+categories.workspace = true
 readme = "../../README.md"
 
 [features]
 default = []
 # Ecosystem integrations
-burn = []
-cubecl = []
+burn = ["dep:burn"]
+cubecl = ["dep:cubecl"]
 rust-ai-core = ["dep:rust-ai-core", "dep:candle-core"]
 cuda = ["rust-ai-core", "rust-ai-core/cuda"]
 tritter-accel = []
@@ -29,10 +30,10 @@ sha2 = { workspace = true }
 hex = { workspace = true }
 tokio = { workspace = true, optional = true }
 
-aphelion-macros = { version = "1.2.1", path = "../aphelion-macros" }
+aphelion-macros = { version = "1.2.2", path = "../aphelion-macros" }
 
 # Ecosystem dependencies
-# burn = { version = "0.16", optional = true }
-# cubecl = { version = "0.4", optional = true }
+burn = { workspace = true, optional = true }
+cubecl = { workspace = true, optional = true }
 rust-ai-core = { workspace = true, optional = true }
 candle-core = { workspace = true, optional = true }

@@ -1,4 +1,79 @@
-//! Aphelion core APIs: configuration, tracing, graph building, and backend abstractions.
+//! # aphelion-core
+//!
+//! Core library for the Aphelion AI Framework.
+//!
+//! ## Why This Crate Exists
+//!
+//! Aphelion is a framework frontend that provides an easier entrypoint for AI
+//! engineering in Rust. This crate provides the core infrastructure that unifies
+//! access to Rust AI libraries through a consistent API.
+//!
+//! Building AI systems means integrating multiple libraries: tensor operations,
+//! memory management, device handling, training loops. aphelion-core handles:
+//!
+//! - **Unified API**: One consistent interface to underlying AI libraries
+//!   (rust-ai-core, Candle, Burn, CubeCL).
+//!
+//! - **Reusable Components**: Configurations and pipelines can be templated,
+//!   shared, and versioned for reproducible experiments.
+//!
+//! - **Deterministic graph hashing**: SHA-256 over canonicalized node data ensures
+//!   identical configurations produce identical hashes, regardless of construction order.
+//!
+//! - **Structured tracing**: Every operation emits typed events. No printf debugging.
+//!   Export to JSON for analysis or feed to observability systems.
+//!
+//! - **Backend abstraction**: Write once, run on CPU, GPU, or accelerators. The
+//!   `Backend` trait abstracts hardware differences.
+//!
+//! - **Pipeline composition**: Stages execute in order with hooks for customization.
+//!   Errors propagate with context. Progress is observable.
+//!
+//! ## Module Organization
+//!
+//! | Module | Purpose |
+//! |--------|---------|
+//! | [`config`] | Model configuration with typed parameters and validation |
+//! | [`graph`] | DAG representation of model architecture |
+//! | [`pipeline`] | Stage-based execution with hooks and progress tracking |
+//! | [`backend`] | Hardware abstraction for CPU/GPU/accelerator targets |
+//! | [`diagnostics`] | Structured tracing and event logging |
+//! | [`validation`] | Composable validators for configuration checking |
+//! | [`error`] | Typed errors with context and chaining |
+//! | [`export`] | Serialization of trace events to JSON |
+//!
+//! ## Feature Flags
+//!
+//! | Feature | Effect |
+//! |---------|--------|
+//! | `burn` | Enables Burn deep learning backend integration |
+//! | `cubecl` | Enables CubeCL GPU compute backend |
+//! | `rust-ai-core` | Enables memory tracking, device detection, dtype utilities |
+//! | `cuda` | Enables CUDA support (requires `rust-ai-core`) |
+//! | `tokio` | Enables async pipeline execution |
+//! | `tritter-accel` | Enables Tritter hardware acceleration |
+//!
+//! ## Quick Start
+//!
+//! ```rust
+//! use aphelion_core::prelude::*;
+//!
+//! // Build a model graph
+//! let mut graph = BuildGraph::default();
+//! let encoder = graph.add_node("encoder", ModelConfig::new("enc", "1.0.0"));
+//! let decoder = graph.add_node("decoder", ModelConfig::new("dec", "1.0.0"));
+//! graph.add_edge(encoder, decoder);
+//!
+//! // Execute pipeline
+//! let backend = NullBackend::cpu();
+//! let trace = InMemoryTraceSink::new();
+//! let ctx = BuildContext::new(&backend, &trace);
+//! let result = BuildPipeline::standard().execute(&ctx, graph)?;
+//!
+//! // Hash is deterministic
+//! assert_eq!(result.stable_hash().len(), 64); // SHA-256 hex
+//! # Ok::<(), aphelion_core::error::AphelionError>(())
+//! ```
 
 pub mod backend;
 pub mod config;

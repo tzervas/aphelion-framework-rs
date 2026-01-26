@@ -9,7 +9,6 @@
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use rust_ai_core::memory::MemoryTracker as RustMemoryTracker;
@@ -223,40 +222,35 @@ fn cuda_available() -> bool {
 ///         - name: Human-readable device name
 #[pyfunction]
 #[pyo3(signature = (force_cpu=false, cuda_device=0))]
-fn get_device_info(force_cpu: bool, cuda_device: usize) -> PyResult<HashMap<String, PyObject>> {
-    Python::with_gil(|py| {
-        let config = DeviceConfig::new()
-            .with_force_cpu(force_cpu)
-            .with_cuda_device(cuda_device);
+fn get_device_info(py: Python<'_>, force_cpu: bool, cuda_device: usize) -> PyResult<Py<PyAny>> {
+    let config = DeviceConfig::new()
+        .with_force_cpu(force_cpu)
+        .with_cuda_device(cuda_device);
 
-        let device = get_device(&config)
-            .map_err(|e| PyRuntimeError::new_err(format!("Device error: {e}")))?;
+    let device =
+        get_device(&config).map_err(|e| PyRuntimeError::new_err(format!("Device error: {e}")))?;
 
-        let mut result: HashMap<String, PyObject> = HashMap::new();
+    let dict = pyo3::types::PyDict::new(py);
 
-        match device {
-            candle_core::Device::Cuda(_) => {
-                result.insert("type".to_string(), "cuda".into_py(py));
-                result.insert("ordinal".to_string(), cuda_device.into_py(py));
-                result.insert(
-                    "name".to_string(),
-                    format!("CUDA:{cuda_device}").into_py(py),
-                );
-            }
-            candle_core::Device::Cpu => {
-                result.insert("type".to_string(), "cpu".into_py(py));
-                result.insert("ordinal".to_string(), py.None());
-                result.insert("name".to_string(), "CPU".into_py(py));
-            }
-            candle_core::Device::Metal(_) => {
-                result.insert("type".to_string(), "metal".into_py(py));
-                result.insert("ordinal".to_string(), 0_usize.into_py(py));
-                result.insert("name".to_string(), "Metal:0".into_py(py));
-            }
+    match device {
+        candle_core::Device::Cuda(_) => {
+            dict.set_item("type", "cuda")?;
+            dict.set_item("ordinal", cuda_device)?;
+            dict.set_item("name", format!("CUDA:{cuda_device}"))?;
         }
+        candle_core::Device::Cpu => {
+            dict.set_item("type", "cpu")?;
+            dict.set_item("ordinal", py.None())?;
+            dict.set_item("name", "CPU")?;
+        }
+        candle_core::Device::Metal(_) => {
+            dict.set_item("type", "metal")?;
+            dict.set_item("ordinal", 0_usize)?;
+            dict.set_item("name", "Metal:0")?;
+        }
+    }
 
-        Ok(result)
-    })
+    Ok(dict.into())
 }
 
 /// Get bytes per element for a data type.

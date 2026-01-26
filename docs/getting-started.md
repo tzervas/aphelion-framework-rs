@@ -1,6 +1,6 @@
 # Getting Started with Aphelion Framework
 
-Welcome to Aphelion! This guide will help you get up and running with the Aphelion Framework for building AI model pipelines with deterministic, traceable execution.
+Welcome to Aphelion. This guide covers installation, core concepts, and common patterns for using the Aphelion Framework as a frontend for AI model development in Rust.
 
 ## Table of Contents
 
@@ -63,7 +63,7 @@ Add `aphelion-core` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-aphelion-core = "1.0"
+aphelion-core = "1.2"
 serde_json = "1.0"  # Required for parameter values
 ```
 
@@ -77,11 +77,20 @@ aphelion-core = { version = "1.0", features = ["tokio"] }
 serde_json = "1.0"
 ```
 
+### With rust-ai-core Integration
+
+```toml
+[dependencies]
+aphelion-core = { version = "1.2", features = ["rust-ai-core", "tokio"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+```
+
 ### Full Installation (All Features)
 
 ```toml
 [dependencies]
-aphelion-core = { version = "1.0", features = ["burn", "cubecl", "tokio"] }
+aphelion-core = { version = "1.2", features = ["rust-ai-core", "burn", "cubecl", "tokio"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ```
@@ -499,10 +508,11 @@ Aphelion uses feature flags to keep the core library lightweight while allowing 
 | Feature | Description | Use Case |
 |---------|-------------|----------|
 | `default` | Core functionality only | Basic pipeline building |
+| `rust-ai-core` | Memory tracking, device detection, dtype utilities via rust-ai-core | Production deployments |
+| `cuda` | CUDA GPU support (requires `rust-ai-core`) | NVIDIA GPU acceleration |
 | `burn` | Burn deep learning framework integration | Neural network training/inference |
-| `cubecl` | CubeCL GPU compute backend | GPU acceleration |
+| `cubecl` | CubeCL GPU compute backend | GPU compute |
 | `tokio` | Async pipeline execution | Concurrent operations |
-| `rust-ai-core` | Rust AI Core integration | Interop with rust-ai ecosystem |
 | `tritter-accel` | Tritter accelerator support | Specialized hardware |
 
 ### Enabling Features
@@ -890,4 +900,4 @@ pipeline.execute_async(&ctx, graph).await?  // Async (tokio feature)
 AphelionResult<T>                       // = Result<T, AphelionError>
 ```
 
-Happy building with Aphelion! 🚀
+Happy building with Aphelion.

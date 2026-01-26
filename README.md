@@ -1,32 +1,43 @@
 # Aphelion Framework
 
-A Rust framework for building AI model pipelines with deterministic, traceable execution.
+A unified frontend for AI model development in Rust.
 
-## What It Does
+## Overview
 
-Aphelion provides infrastructure for constructing and executing AI model build pipelines. It handles:
+Aphelion is a framework frontend that provides an easier entrypoint for AI engineering tasks. It unifies access to Rust AI libraries through a consistent API, handling the complexity of model configuration, pipeline orchestration, and hardware abstraction so you can focus on building models.
 
-- **Graph Construction**: DAG-based model architecture representation with deterministic hashing
-- **Configuration Management**: Type-safe parameters with validation and semantic versioning
-- **Pipeline Orchestration**: Composable stages with hooks, progress tracking, and conditional execution
-- **Backend Abstraction**: Hardware-agnostic interface for CPU, GPU, and accelerator backends
-- **Diagnostics**: Structured tracing with exportable event logs
+### Why Aphelion
 
-## What It Does Not Do
+Building AI systems in Rust means integrating multiple libraries: tensor operations, memory management, device handling, training loops. Aphelion provides:
 
-Aphelion is **not** a tensor library or neural network implementation. It does not:
+- **Unified API**: One consistent interface to underlying AI libraries
+- **Reusable Components**: Configurations and pipelines can be templated and shared
+- **Deterministic Builds**: SHA-256 hashing ensures identical configs produce identical models
+- **Configuration Management**: Type-safe parameters with validation and versioning
+- **Pipeline Orchestration**: Composable stages for training, inference, and deployment
+- **Backend Abstraction**: Write once, run on CPU, GPU, or accelerators
+- **Diagnostics**: Structured tracing for debugging and observability
 
-- Perform matrix operations or automatic differentiation
-- Provide pre-built neural network layers
-- Train models or run inference directly
+### Ecosystem Integration
 
-For those capabilities, integrate with backends like [Burn](https://github.com/tracel-ai/burn) via the `burn` feature flag.
+Aphelion integrates with the Rust AI ecosystem, providing a frontend to:
+
+| Library | Purpose | Feature Flag |
+|---------|---------|--------------|
+| [rust-ai-core](https://crates.io/crates/rust-ai-core) | Memory tracking, device detection, dtype utilities | `rust-ai-core` |
+| [Candle](https://github.com/huggingface/candle) | Tensor operations and model inference | via `rust-ai-core` |
+| [Burn](https://github.com/tracel-ai/burn) | Deep learning framework | `burn` |
+| [CubeCL](https://github.com/tracel-ai/cubecl) | GPU compute | `cubecl` |
+
+Enable features based on your needs. The framework handles library initialization, device selection, and resource management.
 
 ## Installation
 
+### Rust
+
 ```toml
 [dependencies]
-aphelion-core = "1.0"
+aphelion-core = "1.2"
 serde_json = "1.0"  # Required for parameter values
 ```
 
@@ -34,14 +45,50 @@ Optional features:
 
 ```toml
 [dependencies]
-aphelion-core = { version = "1.0", features = ["burn", "tokio"] }
+aphelion-core = { version = "1.2", features = ["rust-ai-core", "tokio"] }
 ```
 
 | Feature | Description |
 |---------|-------------|
-| `burn` | Burn deep learning framework backend |
-| `cubecl` | CubeCL GPU compute backend |
+| `rust-ai-core` | Memory tracking, device detection, dtype utilities via [rust-ai-core](https://crates.io/crates/rust-ai-core) |
+| `cuda` | CUDA GPU support (requires `rust-ai-core`) |
+| `burn` | Burn deep learning framework backend (placeholder) |
+| `cubecl` | CubeCL GPU compute backend (placeholder) |
 | `tokio` | Async pipeline execution support |
+
+### Python
+
+```bash
+pip install aphelion-framework
+```
+
+For memory tracking and device detection:
+
+```bash
+pip install aphelion-framework rust-ai-core-bindings
+```
+
+Python usage:
+
+```python
+import aphelion
+
+# Build configuration
+config = aphelion.ModelConfig("transformer", "1.0.0")
+config = config.with_param("d_model", 512)
+config = config.with_param("n_heads", 8)
+
+# Build graph
+graph = aphelion.BuildGraph()
+node = graph.add_node("encoder", config)
+
+# Execute pipeline
+ctx = aphelion.BuildContext.with_null_backend()
+pipeline = aphelion.BuildPipeline.standard()
+result = pipeline.execute(ctx, graph)
+
+print(f"Hash: {result.stable_hash()}")
+```
 
 ## Core Concepts
 
@@ -263,14 +310,15 @@ if let Some(source) = error.source() {
 ```
 aphelion-framework-rs/
 ├── crates/
-│   ├── aphelion-core/      # Core library (~6000 lines)
-│   ├── aphelion-macros/    # Proc macros (#[aphelion_model])
+│   ├── aphelion-core/      # Core library: graphs, pipelines, backends
+│   ├── aphelion-macros/    # Proc macros: #[aphelion_model]
+│   ├── aphelion-python/    # Python bindings via PyO3
 │   ├── aphelion-tests/     # Integration tests
 │   └── aphelion-examples/  # Usage examples
 ├── docs/
-│   ├── ARCHITECTURE.md     # System design
-│   └── API-GUIDE.md        # Usage patterns
-└── SPEC.md                 # Success criteria
+│   ├── ARCHITECTURE.md     # System design and data flow
+│   └── API-GUIDE.md        # Usage patterns with examples
+└── SPEC.md                 # Success criteria and compliance
 ```
 
 ## Testing
@@ -319,10 +367,11 @@ cargo run --package aphelion-examples --example validation
 
 ## Version History
 
-| Version | Status | Features |
-|---------|--------|----------|
-| 1.0.0 | Released | Core pipeline, graph, config, validation, tracing |
-| 1.1.0 | Released | DX improvements: typed params, presets, async, auto-detect |
+| Version | Features |
+|---------|----------|
+| 1.2.1 | rust-ai-core v0.2.6 integration, Python bindings, memory tracking |
+| 1.1.0 | Typed params, preset pipelines, async execution, backend auto-detect |
+| 1.0.0 | Core pipeline, graph, config, validation, tracing |
 
 ## Contributing
 
