@@ -46,3 +46,7 @@ half = "2.7"
 pyo3 = "0.27"
 pythonize = "0.27"
 pyo3-async-runtimes = "0.27"
+
+# Internal crates (path for dev, version for release)
+aphelion-macros = { version = "1.2.2", path = "crates/aphelion-macros" }
+aphelion-core = { version = "1.2.2", path = "crates/aphelion-core" }

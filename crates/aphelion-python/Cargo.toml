@@ -16,7 +16,7 @@ name = "aphelion"
 crate-type = ["cdylib"]
 
 [dependencies]
-aphelion-core = { path = "../aphelion-core" }
+aphelion-core = { workspace = true }
 # Python bindings - supports Python 3.10+ via abi3
 pyo3 = { workspace = true, features = ["extension-module", "abi3-py310"] }
 pyo3-async-runtimes = { workspace = true, features = ["tokio-runtime"] }

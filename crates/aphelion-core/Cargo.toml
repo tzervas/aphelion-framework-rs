@@ -9,7 +9,7 @@ repository.workspace = true
 description = "Core library for Aphelion AI framework - unified frontend for AI model development"
 keywords.workspace = true
 categories.workspace = true
-readme = "../../README.md"
+readme = "README.md"
 
 [features]
 default = []
@@ -30,7 +30,7 @@ sha2 = { workspace = true }
 hex = { workspace = true }
 tokio = { workspace = true, optional = true }
 
-aphelion-macros = { version = "1.2.2", path = "../aphelion-macros" }
+aphelion-macros = { workspace = true }
 
 # Ecosystem dependencies
 burn = { workspace = true, optional = true }

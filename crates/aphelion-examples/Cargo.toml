@@ -12,5 +12,5 @@ default = []
 tritter-accel = ["aphelion-core/tritter-accel"]
 
 [dependencies]
-aphelion-core = { path = "../aphelion-core" }
+aphelion-core = { workspace = true }
 serde_json = { workspace = true }
