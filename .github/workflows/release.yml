@@ -51,6 +51,8 @@ jobs:
     name: Publish to crates.io
     needs: test
     runs-on: ubuntu-latest
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -63,15 +65,25 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Publish aphelion-macros
-        run: cargo publish -p aphelion-macros --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        continue-on-error: true  # May already be published
+        run: |
+          VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "aphelion-macros") | .version')
+          if cargo search aphelion-macros --limit 1 | grep -q "aphelion-macros = \"$VERSION\""; then
+            echo "aphelion-macros@$VERSION already published, skipping"
+          else
+            cargo publish -p aphelion-macros
+          fi
 
       - name: Wait for crates.io index
         run: sleep 30
 
       - name: Publish aphelion-core
-        run: cargo publish -p aphelion-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        continue-on-error: true
+        run: |
+          VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "aphelion-core") | .version')
+          if cargo search aphelion-core --limit 1 | grep -q "aphelion-core = \"$VERSION\""; then
+            echo "aphelion-core@$VERSION already published, skipping"
+          else
+            cargo publish -p aphelion-core
+          fi
 
   # Build Python wheels for multiple platforms
   build-python-wheels:
