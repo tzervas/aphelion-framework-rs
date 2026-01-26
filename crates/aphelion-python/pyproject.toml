@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "aphelion-framework"
-version = "1.2.0"
+version = "1.2.1"
 description = "Python bindings for the Aphelion AI Framework - transparent, traceable AI model construction"
 readme = "README.md"
 license = { text = "MIT OR Apache-2.0" }
@@ -45,7 +45,7 @@ dev = [
 ]
 # Optional rust-ai-core integration for memory tracking, device detection, etc.
 core = [
-    "rust-ai-core>=0.2.5",
+    "rust-ai-core-bindings>=0.2.6",
 ]
 
 [tool.maturin]

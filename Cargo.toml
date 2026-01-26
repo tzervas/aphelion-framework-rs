@@ -9,7 +9,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.2.0"
+version = "1.2.1"
 edition = "2021"
 license = "MIT"
 authors = ["Tyler Zervas <tz-dev@vectorweight.com>"]
@@ -36,6 +36,6 @@ proc-macro2 = "1"
 # Ecosystem dependencies (feature-gated)
 # burn = "0.16"      # TODO: Enable when burn integration is ready
 # cubecl = "0.4"     # TODO: Enable when cubecl integration is ready
-rust-ai-core = "0.2.5"
+rust-ai-core = "0.2.6"
 candle-core = "0.9.2"
 half = "2.7"

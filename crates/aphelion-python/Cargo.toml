@@ -22,17 +22,17 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 serde_json = "1"
 pythonize = "0.22"
 
-# rust-ai-core with python bindings for memory/device/dtype utilities
-rust-ai-core = { workspace = true, optional = true, features = ["python"] }
+# rust-ai-core for memory/device/dtype utilities (Rust side only)
+# Python users should install rust-ai-core-bindings separately for the full Python API
+rust-ai-core = { workspace = true, optional = true }
 candle-core = { workspace = true, optional = true }
 half = { workspace = true, optional = true }
-numpy = { version = "0.22", optional = true }
 
 [features]
 default = []
 burn = ["aphelion-core/burn"]
 cubecl = ["aphelion-core/cubecl"]
-rust-ai-core = ["aphelion-core/rust-ai-core", "dep:rust-ai-core", "dep:candle-core", "dep:half", "dep:numpy"]
+rust-ai-core = ["aphelion-core/rust-ai-core", "dep:rust-ai-core", "dep:candle-core", "dep:half"]
 cuda = ["aphelion-core/cuda", "rust-ai-core/cuda"]
 tritter-accel = ["aphelion-core/tritter-accel"]
 # Build all optional backends

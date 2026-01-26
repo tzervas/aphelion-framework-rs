@@ -49,7 +49,7 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
 name = "aphelion-core"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "aphelion-macros",
  "candle-core",
@@ -65,7 +65,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-examples"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "aphelion-core",
  "serde_json",
@@ -73,7 +73,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-macros"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -82,12 +82,11 @@ dependencies = [
 
 [[package]]
 name = "aphelion-python"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "aphelion-core",
  "candle-core",
  "half",
- "numpy",
  "pyo3",
  "pyo3-async-runtimes",
  "pythonize",
@@ -98,7 +97,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-tests"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "aphelion-core",
  "serde_json",
@@ -2254,16 +2253,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "matrixmultiply"
-version = "0.3.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a06de3016e9fae57a36fd14dba131fccf49f74b40b7fbdb472f96e361ec71a08"
-dependencies = [
- "autocfg",
- "rawpointer",
-]
-
-[[package]]
 name = "md5"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2375,21 +2364,6 @@ name = "nb"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d5439c4ad607c3c23abf66de8c8bf57ba8adcd1f129e699851a6e43935d339d"
-
-[[package]]
-name = "ndarray"
-version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "882ed72dce9365842bf196bdeedf5055305f11fc8c03dee7bb0194a6cad34841"
-dependencies = [
- "matrixmultiply",
- "num-complex",
- "num-integer",
- "num-traits",
- "portable-atomic",
- "portable-atomic-util",
- "rawpointer",
-]
 
 [[package]]
 name = "ndk-sys"
@@ -2517,21 +2491,6 @@ checksum = "91df4bbde75afed763b708b7eee1e8e7651e02d97f6d5dd763e89367e957b23b"
 dependencies = [
  "hermit-abi",
  "libc",
-]
-
-[[package]]
-name = "numpy"
-version = "0.22.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edb929bc0da91a4d85ed6c0a84deaa53d411abfb387fc271124f91bf6b89f14e"
-dependencies = [
- "libc",
- "ndarray",
- "num-complex",
- "num-integer",
- "num-traits",
- "pyo3",
- "rustc-hash 1.1.0",
 ]
 
 [[package]]
@@ -2803,7 +2762,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b14b5775b5ff446dd1056212d778012cbe8a0fbffd368029fd9e25b514479c38"
 dependencies = [
  "once_cell",
- "python3-dll-a",
  "target-lexicon",
 ]
 
@@ -2840,15 +2798,6 @@ dependencies = [
  "pyo3-build-config",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "python3-dll-a"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d381ef313ae70b4da5f95f8a4de773c6aa5cd28f73adec4b4a31df70b66780d8"
-dependencies = [
- "cc",
 ]
 
 [[package]]
@@ -2990,12 +2939,6 @@ name = "raw-window-handle"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
-
-[[package]]
-name = "rawpointer"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
 
 [[package]]
 name = "rayon"
@@ -3144,16 +3087,14 @@ dependencies = [
 
 [[package]]
 name = "rust-ai-core"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ebed23b76b3a84a93fc4aec9c4511515f400815e9fa3954efffa5e478678402"
+checksum = "85586febda49e3c4999870f82ff767294b7255edd42972932d3255d1bc3d0135"
 dependencies = [
  "candle-core",
  "cubecl",
  "cubecl-cuda",
  "half",
- "numpy",
- "pyo3",
  "thiserror 2.0.18",
  "tracing",
  "tracing-subscriber",
