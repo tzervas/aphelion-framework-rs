@@ -107,26 +107,21 @@ jobs:
 
       - name: Build wheels (universal)
         working-directory: crates/aphelion-python
-        run: maturin build --release --strip --find-interpreter
+        run: maturin build --release --strip --find-interpreter --out dist
 
       - name: List built wheels
         shell: bash
         run: |
           echo "Checking for wheels directory..."
-          if [ -d "crates/aphelion-python/target/wheels/" ]; then
-            ls -lah crates/aphelion-python/target/wheels/
-          else
-            echo "ERROR: wheels directory not found!"
-            echo "Listing target directory:"
-            ls -lah crates/aphelion-python/target/ || echo "target directory doesn't exist"
-            exit 1
-          fi
+          ls -lah crates/aphelion-python/dist/
+          echo "Built wheels:"
+          ls crates/aphelion-python/dist/*.whl
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}
-          path: crates/aphelion-python/target/wheels/*.whl
+          path: crates/aphelion-python/dist/*.whl
           if-no-files-found: error
 
   # Build source distribution
