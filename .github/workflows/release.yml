@@ -25,11 +25,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run tests
-        run: cargo test --workspace
-
-      - name: Run tests with rust-ai-core
-        run: cargo test --workspace --features rust-ai-core
-        continue-on-error: true  # May fail if rust-ai-core has issues
+        run: cargo test --workspace --all-features
 
   # Create GitHub Release
   github-release:
@@ -93,14 +89,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.11'
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -110,15 +105,20 @@ jobs:
       - name: Install maturin
         run: pip install maturin
 
-      - name: Build wheel
+      - name: Build wheels (universal)
         working-directory: crates/aphelion-python
-        run: maturin build --release --strip --out dist
+        run: maturin build --release --strip --interpreter python3.10 python3.11 python3.12 python3.13
+
+      - name: List built wheels
+        shell: bash
+        run: ls -lah crates/aphelion-python/target/wheels/
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: crates/aphelion-python/dist/*.whl
+          name: wheels-${{ matrix.os }}
+          path: crates/aphelion-python/target/wheels/*.whl
+          if-no-files-found: error
 
   # Build source distribution
   build-sdist:
@@ -157,25 +157,51 @@ jobs:
     permissions:
       id-token: write  # Required for trusted publishing
     steps:
-      - name: Download all wheel artifacts
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      - name: Download Ubuntu wheels
         uses: actions/download-artifact@v4
         with:
-          pattern: wheels-*
+          name: wheels-ubuntu-latest
           path: dist
-          merge-multiple: true
 
-      - name: Download sdist artifact
+      - name: Download macOS wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-macos-latest
+          path: dist
+
+      - name: Download Windows wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-windows-latest
+          path: dist
+
+      - name: Download sdist
         uses: actions/download-artifact@v4
         with:
           name: sdist
           path: dist
 
       - name: List distribution files
-        run: ls -la dist/
+        run: |
+          echo "=== Distribution files ==="
+          ls -lah dist/
+          echo "=== File types ==="
+          file dist/* || true
+
+      - name: Verify only .whl and .tar.gz files
+        run: |
+          # Check for any non-wheel/non-tarball files
+          if ls dist/* 2>/dev/null | grep -v -E '\.(whl|tar\.gz)$'; then
+            echo "Error: Non-wheel/non-tarball files found in dist/"
+            exit 1
+          fi
+          echo "All files are valid .whl or .tar.gz"
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          # Uses trusted publishing - no API token needed
-          # Configure at https://pypi.org/manage/project/aphelion/settings/publishing/
           skip-existing: true
+          verbose: true
