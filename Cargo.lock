@@ -1003,20 +1003,19 @@ dependencies = [
 [[package]]
 name = "candle-core"
 version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c15b675b80d994b2eadb20a4bbe434eabeb454eac3ee5e2b4cf6f147ee9be091"
+source = "git+https://github.com/tzervas/qlora-candle.git?branch=use-qlora-gemm#4773ae37bcfc28bdeb049eb31ac95c2689936eaf"
 dependencies = [
  "byteorder",
  "candle-kernels",
  "candle-ug",
  "cudarc 0.19.0",
  "float8 0.6.0",
- "gemm 0.19.0",
  "half",
  "libm",
  "memmap2",
  "num-traits",
  "num_cpus",
+ "qlora-gemm",
  "rand 0.9.2",
  "rand_distr",
  "rayon",
@@ -1029,8 +1028,7 @@ dependencies = [
 [[package]]
 name = "candle-kernels"
 version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8455f84bd810047c7c41216683c1020c915a9f8a740b3b0eabdd4fb2fbaa660"
+source = "git+https://github.com/tzervas/qlora-candle.git?branch=use-qlora-gemm#4773ae37bcfc28bdeb049eb31ac95c2689936eaf"
 dependencies = [
  "bindgen_cuda",
 ]
@@ -1038,8 +1036,7 @@ dependencies = [
 [[package]]
 name = "candle-ug"
 version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c22d62be69068bf58987a45f690612739d8d2ea1bf508c1b87dc6815a019575d"
+source = "git+https://github.com/tzervas/qlora-candle.git?branch=use-qlora-gemm#4773ae37bcfc28bdeb049eb31ac95c2689936eaf"
 dependencies = [
  "ug",
  "ug-cuda",
@@ -2544,32 +2541,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab96b703d31950f1aeddded248bc95543c9efc7ac9c4a21fda8703a83ee35451"
 dependencies = [
  "dyn-stack",
- "gemm-c32 0.18.2",
- "gemm-c64 0.18.2",
- "gemm-common 0.18.2",
- "gemm-f16 0.18.2",
- "gemm-f32 0.18.2",
- "gemm-f64 0.18.2",
- "num-complex",
- "num-traits",
- "paste",
- "raw-cpuid",
- "seq-macro",
-]
-
-[[package]]
-name = "gemm"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa0673db364b12263d103b68337a68fbecc541d6f6b61ba72fe438654709eacb"
-dependencies = [
- "dyn-stack",
- "gemm-c32 0.19.0",
- "gemm-c64 0.19.0",
- "gemm-common 0.19.0",
- "gemm-f16 0.19.0",
- "gemm-f32 0.19.0",
- "gemm-f64 0.19.0",
+ "gemm-c32",
+ "gemm-c64",
+ "gemm-common",
+ "gemm-f16",
+ "gemm-f32",
+ "gemm-f64",
  "num-complex",
  "num-traits",
  "paste",
@@ -2584,22 +2561,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6db9fd9f40421d00eea9dd0770045a5603b8d684654816637732463f4073847"
 dependencies = [
  "dyn-stack",
- "gemm-common 0.18.2",
- "num-complex",
- "num-traits",
- "paste",
- "raw-cpuid",
- "seq-macro",
-]
-
-[[package]]
-name = "gemm-c32"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "086936dbdcb99e37aad81d320f98f670e53c1e55a98bee70573e83f95beb128c"
-dependencies = [
- "dyn-stack",
- "gemm-common 0.19.0",
+ "gemm-common",
  "num-complex",
  "num-traits",
  "paste",
@@ -2614,22 +2576,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfcad8a3d35a43758330b635d02edad980c1e143dc2f21e6fd25f9e4eada8edf"
 dependencies = [
  "dyn-stack",
- "gemm-common 0.18.2",
- "num-complex",
- "num-traits",
- "paste",
- "raw-cpuid",
- "seq-macro",
-]
-
-[[package]]
-name = "gemm-c64"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20c8aeeeec425959bda4d9827664029ba1501a90a0d1e6228e48bef741db3a3f"
-dependencies = [
- "dyn-stack",
- "gemm-common 0.19.0",
+ "gemm-common",
  "num-complex",
  "num-traits",
  "paste",
@@ -2659,53 +2606,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "gemm-common"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88027625910cc9b1085aaaa1c4bc46bb3a36aad323452b33c25b5e4e7c8e2a3e"
-dependencies = [
- "bytemuck",
- "dyn-stack",
- "half",
- "libm",
- "num-complex",
- "num-traits",
- "once_cell",
- "paste",
- "pulp 0.22.2",
- "raw-cpuid",
- "rayon",
- "seq-macro",
- "sysctl",
-]
-
-[[package]]
 name = "gemm-f16"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cff95ae3259432f3c3410eaa919033cd03791d81cebd18018393dc147952e109"
 dependencies = [
  "dyn-stack",
- "gemm-common 0.18.2",
- "gemm-f32 0.18.2",
- "half",
- "num-complex",
- "num-traits",
- "paste",
- "raw-cpuid",
- "rayon",
- "seq-macro",
-]
-
-[[package]]
-name = "gemm-f16"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3df7a55202e6cd6739d82ae3399c8e0c7e1402859b30e4cb780e61525d9486e"
-dependencies = [
- "dyn-stack",
- "gemm-common 0.19.0",
- "gemm-f32 0.19.0",
+ "gemm-common",
+ "gemm-f32",
  "half",
  "num-complex",
  "num-traits",
@@ -2722,22 +2630,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc8d3d4385393304f407392f754cd2dc4b315d05063f62cf09f47b58de276864"
 dependencies = [
  "dyn-stack",
- "gemm-common 0.18.2",
- "num-complex",
- "num-traits",
- "paste",
- "raw-cpuid",
- "seq-macro",
-]
-
-[[package]]
-name = "gemm-f32"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02e0b8c9da1fbec6e3e3ab2ce6bc259ef18eb5f6f0d3e4edf54b75f9fd41a81c"
-dependencies = [
- "dyn-stack",
- "gemm-common 0.19.0",
+ "gemm-common",
  "num-complex",
  "num-traits",
  "paste",
@@ -2752,22 +2645,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35b2a4f76ce4b8b16eadc11ccf2e083252d8237c1b589558a49b0183545015bd"
 dependencies = [
  "dyn-stack",
- "gemm-common 0.18.2",
- "num-complex",
- "num-traits",
- "paste",
- "raw-cpuid",
- "seq-macro",
-]
-
-[[package]]
-name = "gemm-f64"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "056131e8f2a521bfab322f804ccd652520c79700d81209e9d9275bbdecaadc6a"
-dependencies = [
- "dyn-stack",
- "gemm-common 0.19.0",
+ "gemm-common",
  "num-complex",
  "num-traits",
  "paste",
@@ -4490,6 +4368,125 @@ dependencies = [
 ]
 
 [[package]]
+name = "qlora-gemm"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2687ff265a287a63570b5bd16828f5d7e6c2bb91faf11ccaafea02287316b106"
+dependencies = [
+ "dyn-stack",
+ "num-complex",
+ "num-traits",
+ "qlora-gemm-c32",
+ "qlora-gemm-c64",
+ "qlora-gemm-common",
+ "qlora-gemm-f16",
+ "qlora-gemm-f32",
+ "qlora-gemm-f64",
+ "qlora-paste",
+ "raw-cpuid",
+ "seq-macro",
+]
+
+[[package]]
+name = "qlora-gemm-c32"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c18569f1a74d4347fb551cf7cd1357cbf0e2c29ae7d28709bdeb791e4c48f527"
+dependencies = [
+ "dyn-stack",
+ "num-complex",
+ "num-traits",
+ "qlora-gemm-common",
+ "qlora-paste",
+ "raw-cpuid",
+ "seq-macro",
+]
+
+[[package]]
+name = "qlora-gemm-c64"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa01e044b64c38edb5fa73356fd6d223966b0d6b8436a7640be0f7bce257ff03"
+dependencies = [
+ "dyn-stack",
+ "num-complex",
+ "num-traits",
+ "qlora-gemm-common",
+ "qlora-paste",
+ "raw-cpuid",
+ "seq-macro",
+]
+
+[[package]]
+name = "qlora-gemm-common"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "354e0997a5ff4ad4de158469378dc720c2794a8aafc79ebb31214f6d7e142493"
+dependencies = [
+ "bytemuck",
+ "dyn-stack",
+ "half",
+ "libm",
+ "num-complex",
+ "num-traits",
+ "once_cell",
+ "pulp 0.22.2",
+ "qlora-paste",
+ "raw-cpuid",
+ "rayon",
+ "seq-macro",
+ "sysctl",
+]
+
+[[package]]
+name = "qlora-gemm-f16"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc7581e1808eb3a69bb1c86008e71ab6adc992dc4687b282bed9f4543a5a030a"
+dependencies = [
+ "dyn-stack",
+ "half",
+ "num-complex",
+ "num-traits",
+ "qlora-gemm-common",
+ "qlora-gemm-f32",
+ "qlora-paste",
+ "raw-cpuid",
+ "rayon",
+ "seq-macro",
+]
+
+[[package]]
+name = "qlora-gemm-f32"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a30a2fe60e301cedfc188b13926c8e9788b89e23ce89e050f3e03896e73ab86"
+dependencies = [
+ "dyn-stack",
+ "num-complex",
+ "num-traits",
+ "qlora-gemm-common",
+ "qlora-paste",
+ "raw-cpuid",
+ "seq-macro",
+]
+
+[[package]]
+name = "qlora-gemm-f64"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c88cae59d83209e99d713e114a13b50d53261300b0c7dc39fc82353a5f448a5"
+dependencies = [
+ "dyn-stack",
+ "num-complex",
+ "num-traits",
+ "qlora-gemm-common",
+ "qlora-paste",
+ "raw-cpuid",
+ "seq-macro",
+]
+
+[[package]]
 name = "qlora-paste"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6188,7 +6185,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76b761acf8af3494640d826a8609e2265e19778fb43306c7f15379c78c9b05b0"
 dependencies = [
- "gemm 0.18.2",
+ "gemm",
  "half",
  "libloading",
  "memmap2",

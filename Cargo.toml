@@ -53,8 +53,8 @@ pyo3-async-runtimes = "0.27"
 aphelion-macros = { version = "1.2.3", path = "crates/aphelion-macros" }
 aphelion-core = { version = "1.2.3", path = "crates/aphelion-core" }
 
-# Patch unmaintained crates with maintained qlora-* forks
-# TODO: Uncomment when 'as-*' branches exist with original names in Cargo.toml
-# [patch.crates-io]
-# paste = { git = "https://github.com/tzervas/qlora-paste", branch = "as-paste" }
-# gemm = { git = "https://github.com/tzervas/qlora-gemm", branch = "as-gemm" }
+# Patch candle crates with qlora-candle fork using maintained dependencies
+# Dependency chain: candle-core -> qlora-gemm v0.20.0 -> qlora-paste v1.0.20
+# PR'd to huggingface/candle for future upstream adoption
+[patch.crates-io]
+candle-core = { git = "https://github.com/tzervas/qlora-candle.git", branch = "use-qlora-gemm" }
