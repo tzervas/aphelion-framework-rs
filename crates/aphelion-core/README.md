@@ -35,6 +35,7 @@ aphelion-core = { version = "1.2", features = ["rust-ai-core", "tritter-accel", 
 | `burn` | Burn deep learning framework backend |
 | `cubecl` | CubeCL GPU compute backend |
 | `tokio` | Async pipeline execution |
+| `python` | Python bindings via PyO3 (builds `aphelion-framework` wheel) |
 
 ## Quick Start
 

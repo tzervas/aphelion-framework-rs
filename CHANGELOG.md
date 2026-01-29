@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.8] - 2026-01-29
+
+### Changed
+- **Unified Python bindings**: Moved from separate `aphelion-python` crate into `aphelion-core` with `python` feature
+- Updated rust-ai-core: 0.2.7 → 0.3.1 (pyo3 0.27.2 compatibility via tritter-accel 0.1.3)
+- Updated candle-core: 0.9 → 0.9.2
+- Simplified CI/release pipeline (single crate for Rust lib + Python wheels)
+
+### Removed
+- `aphelion-python` crate (functionality now in `aphelion-core --features python`)
+
+### Migration
+Python package installation is unchanged:
+```bash
+pip install aphelion-framework
+```
+
+For wheel building from source:
+```bash
+cd crates/aphelion-core
+maturin build --features python
+```
+
+## [1.2.7] - 2026-01-29
+
+### Changed
+- Updated rust-ai-core: 0.2.7 → 0.3.1
+- Updated candle-core: 0.9 → 0.9.2
+- tritter-accel updated to 0.1.3 with pyo3 0.27.2 compatibility
+
 ## [1.2.6] - 2026-01-26
 
 ### Fixed

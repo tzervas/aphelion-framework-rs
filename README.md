@@ -64,7 +64,7 @@ Aphelion is built on the **rust-ai ecosystem**, a collection of crates providing
 
 ### Core Foundation: rust-ai-core
 
-[**rust-ai-core**](https://github.com/tzervas/rust-ai-core) (v0.2.7) is the shared foundation layer providing:
+[**rust-ai-core**](https://github.com/tzervas/rust-ai-core) (v0.3.1) is the shared foundation layer providing:
 
 - **CUDA-first device selection**: Automatic GPU detection with environment variable overrides
 - **Memory tracking**: Budget allocation and peak usage monitoring for GPU memory
@@ -83,7 +83,7 @@ pip install rust-ai-core-bindings
 
 ### Ternary Acceleration: tritter-accel
 
-[**tritter-accel**](https://github.com/tzervas/rust-ai) (v0.1.1) provides BitNet b1.58 ternary operations and VSA gradient compression:
+[**tritter-accel**](https://github.com/tzervas/rust-ai) (v0.1.3) provides BitNet b1.58 ternary operations and VSA gradient compression:
 
 - **Ternary weight packing**: 2-bit per trit storage (4x memory reduction from f32)
 - **Ternary matmul**: Addition-only arithmetic (2-4x speedup)
@@ -368,11 +368,7 @@ aphelion-core = { version = "1.2", features = ["rust-ai-core", "tritter-accel", 
 pip install aphelion-framework
 ```
 
-For memory tracking and device detection:
-
-```bash
-pip install aphelion-framework rust-ai-core-bindings
-```
+The package includes all core features. Memory tracking and device detection are available when the wheel is built with `rust-ai-core` feature.
 
 Python usage:
 
@@ -616,9 +612,8 @@ if let Some(source) = error.source() {
 ```
 aphelion-framework-rs/
 ├── crates/
-│   ├── aphelion-core/      # Core library: graphs, pipelines, backends
+│   ├── aphelion-core/      # Core library: graphs, pipelines, backends, Python bindings
 │   ├── aphelion-macros/    # Proc macros: #[aphelion_model]
-│   ├── aphelion-python/    # Python bindings via PyO3
 │   ├── aphelion-tests/     # Integration tests
 │   └── aphelion-examples/  # Usage examples
 ├── docs/
@@ -626,6 +621,8 @@ aphelion-framework-rs/
 │   └── API-GUIDE.md        # Usage patterns with examples
 └── SPEC.md                 # Success criteria and compliance
 ```
+
+Python bindings are built from `aphelion-core` with the `python` feature enabled.
 
 ## Testing
 
@@ -695,6 +692,8 @@ Example output from tritter_demo:
 
 | Version | Features |
 |---------|----------|
+| 1.2.8 | Unified Python bindings into aphelion-core (`python` feature), rust-ai-core 0.3.1, candle-core 0.9.2 |
+| 1.2.7 | Dependency updates: rust-ai-core 0.3.1, tritter-accel 0.1.3 with pyo3 0.27.2 compatibility |
 | 1.2.6 | Fix: Python package now uses dynamic versioning from Cargo.toml |
 | 1.2.5 | Dependency updates: burn 0.20.1, pyo3 0.27.2, thiserror 2.0.18, half 2.7.1 |
 | 1.2.4 | Security: Replaced unmaintained `paste`/`gemm` with maintained forks. See [SECURITY.md](SECURITY.md#unmaintained-dependency-mitigation) |
