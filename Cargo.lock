@@ -140,7 +140,7 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
 name = "aphelion-core"
-version = "1.2.7"
+version = "1.2.8"
 dependencies = [
  "aphelion-macros",
  "burn",
@@ -162,7 +162,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-examples"
-version = "1.2.7"
+version = "1.2.8"
 dependencies = [
  "aphelion-core",
  "serde_json",
@@ -170,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-macros"
-version = "1.2.7"
+version = "1.2.8"
 dependencies = [
  "proc-macro2",
  "qlora-paste",
@@ -180,7 +180,7 @@ dependencies = [
 
 [[package]]
 name = "aphelion-tests"
-version = "1.2.7"
+version = "1.2.8"
 dependencies = [
  "aphelion-core",
  "serde_json",
