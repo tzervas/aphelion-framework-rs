@@ -6,7 +6,7 @@
 use pyo3::prelude::*;
 use std::collections::BTreeMap;
 
-use aphelion_core::config::ModelConfig;
+use crate::config::ModelConfig;
 
 /// Type-safe configuration for AI model components.
 ///

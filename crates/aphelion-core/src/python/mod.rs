@@ -1,6 +1,6 @@
 //! Python bindings for the Aphelion AI Framework.
 //!
-//! This crate provides Python bindings for aphelion-core via PyO3,
+//! This module provides Python bindings for aphelion-core via PyO3,
 //! enabling Python developers to use Aphelion as a frontend for AI
 //! engineering tasks.
 //!
@@ -90,7 +90,7 @@ mod core;
 ///     HAS_RUST_AI_CORE: True if rust-ai-core integration is available
 ///     HAS_CUDA: True if CUDA support is available
 #[pymodule]
-fn aphelion(m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn aphelion(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Register all submodule types
     config::register(m)?;
     graph::register(m)?;

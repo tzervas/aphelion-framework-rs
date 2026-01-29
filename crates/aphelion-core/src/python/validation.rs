@@ -5,10 +5,8 @@
 
 use pyo3::prelude::*;
 
-use crate::config::PyModelConfig;
-use aphelion_core::validation::{
-    ConfigValidator, NameValidator, ValidationError, VersionValidator,
-};
+use super::config::PyModelConfig;
+use crate::validation::{ConfigValidator, NameValidator, ValidationError, VersionValidator};
 
 /// Validation error describing what failed and why.
 ///

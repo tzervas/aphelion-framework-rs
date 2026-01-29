@@ -5,7 +5,7 @@
 
 use pyo3::prelude::*;
 
-use aphelion_core::backend::{Backend, NullBackend};
+use crate::backend::{Backend, NullBackend};
 
 /// Reference backend for testing and development.
 ///

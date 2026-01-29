@@ -44,16 +44,12 @@ dev = [
     "pytest-asyncio>=0.21",
     "mypy>=1.0",
 ]
-# Optional rust-ai-core integration for memory tracking, device detection, etc.
-core = [
-    "rust-ai-core-bindings>=0.2.6",
-]
 
 [tool.maturin]
-# Build settings
+# Build settings - now building from aphelion-core with python feature
 python-source = "python"
 module-name = "aphelion"
-features = ["pyo3/extension-module"]
+features = ["python"]
 
 # Bindings type
 bindings = "pyo3"
@@ -66,5 +62,5 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 strict = true

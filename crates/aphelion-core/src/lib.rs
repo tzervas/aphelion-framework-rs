@@ -98,6 +98,9 @@ pub mod acceleration;
 #[cfg(feature = "tritter-accel")]
 pub mod tritter_backend;
 
+#[cfg(feature = "python")]
+pub mod python;
+
 pub use aphelion_macros::aphelion_model;
 
 // ============================================================================

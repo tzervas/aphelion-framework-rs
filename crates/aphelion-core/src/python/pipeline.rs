@@ -7,15 +7,15 @@ use pyo3::prelude::*;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use aphelion_core::backend::NullBackend;
-use aphelion_core::diagnostics::{InMemoryTraceSink, TraceEvent, TraceLevel};
-use aphelion_core::error::AphelionError;
-use aphelion_core::graph::BuildGraph;
-use aphelion_core::pipeline::{BuildContext, HashingStage, PipelineStage, ValidationStage};
+use crate::backend::NullBackend;
+use crate::diagnostics::{InMemoryTraceSink, TraceEvent, TraceLevel};
+use crate::error::AphelionError;
+use crate::graph::BuildGraph;
+use crate::pipeline::{BuildContext, HashingStage, PipelineStage, ValidationStage};
 
-use crate::backend::{AnyBackend, PyNullBackend};
-use crate::diagnostics::{AnyTraceSink, PyInMemoryTraceSink};
-use crate::graph::PyBuildGraph;
+use super::backend::{AnyBackend, PyNullBackend};
+use super::diagnostics::{AnyTraceSink, PyInMemoryTraceSink};
+use super::graph::PyBuildGraph;
 
 /// Execution context holding backend and trace sink.
 ///

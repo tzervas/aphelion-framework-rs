@@ -146,7 +146,11 @@ dependencies = [
  "burn",
  "candle-core",
  "cubecl 0.9.0",
+ "half",
  "hex",
+ "pyo3",
+ "pyo3-async-runtimes",
+ "pythonize",
  "rust-ai-core",
  "serde",
  "serde_json",
@@ -172,21 +176,6 @@ dependencies = [
  "qlora-paste",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "aphelion-python"
-version = "1.2.7"
-dependencies = [
- "aphelion-core",
- "candle-core",
- "half",
- "pyo3",
- "pyo3-async-runtimes",
- "pythonize",
- "rust-ai-core",
- "serde_json",
- "tokio",
 ]
 
 [[package]]

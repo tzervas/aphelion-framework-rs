@@ -138,22 +138,22 @@ jobs:
         run: pip install maturin
 
       - name: Build wheels (universal)
-        working-directory: crates/aphelion-python
+        working-directory: crates/aphelion-core
         run: maturin build --release --strip --find-interpreter --out dist
 
       - name: List built wheels
         shell: bash
         run: |
           echo "Checking for wheels directory..."
-          ls -lah crates/aphelion-python/dist/
+          ls -lah crates/aphelion-core/dist/
           echo "Built wheels:"
-          ls crates/aphelion-python/dist/*.whl
+          ls crates/aphelion-core/dist/*.whl
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}
-          path: crates/aphelion-python/dist/*.whl
+          path: crates/aphelion-core/dist/*.whl
           if-no-files-found: error
 
   # Build source distribution
@@ -173,14 +173,14 @@ jobs:
         run: pip install maturin
 
       - name: Build sdist
-        working-directory: crates/aphelion-python
+        working-directory: crates/aphelion-core
         run: maturin sdist --out dist
 
       - name: Upload sdist artifact
         uses: actions/upload-artifact@v4
         with:
           name: sdist
-          path: crates/aphelion-python/dist/*.tar.gz
+          path: crates/aphelion-core/dist/*.tar.gz
 
   # Publish to PyPI
   publish-pypi:
