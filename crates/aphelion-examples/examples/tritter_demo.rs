@@ -119,7 +119,11 @@ fn main() {
                 println!("   Mode: {}", mode);
             }
             if let Some(ratio) = node.metadata.get("accel.compression_ratio") {
-                println!("   Compression Ratio: {} ({}x reduction)", ratio, (1.0 / ratio.as_f64().unwrap_or(1.0)) as i32);
+                println!(
+                    "   Compression Ratio: {} ({}x reduction)",
+                    ratio,
+                    (1.0 / ratio.as_f64().unwrap_or(1.0)) as i32
+                );
             }
             if let Some(det) = node.metadata.get("accel.deterministic") {
                 println!("   Deterministic: {}", det);
