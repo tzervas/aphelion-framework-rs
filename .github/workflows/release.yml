@@ -150,7 +150,7 @@ jobs:
           ls crates/aphelion-core/dist/*.whl
 
       - name: Upload wheel artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.os }}
           path: crates/aphelion-core/dist/*.whl
@@ -177,7 +177,7 @@ jobs:
         run: maturin sdist --out dist
 
       - name: Upload sdist artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: sdist
           path: crates/aphelion-core/dist/*.tar.gz
@@ -272,7 +272,7 @@ jobs:
           ls -lah crates/aphelion-core/pkg/
 
       - name: Upload WASM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wasm-pkg
           path: crates/aphelion-core/pkg/
