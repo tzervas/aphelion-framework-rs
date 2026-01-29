@@ -16,8 +16,8 @@ default = []
 # Ecosystem integrations
 burn = ["dep:burn"]
 cubecl = ["dep:cubecl"]
-rust-ai-core = ["dep:rust-ai-core", "dep:candle-core", "dep:half"]
-cuda = ["rust-ai-core", "rust-ai-core/cuda"]
+rust-ai-core = ["dep:rust-ai-core", "dep:candle-core", "dep:half", "dep:trit-vsa"]
+cuda = ["rust-ai-core", "rust-ai-core/cuda", "trit-vsa/cuda"]
 tritter-accel = []
 tokio = ["dep:tokio"]
 # Python bindings (for building wheels with maturin)
@@ -40,6 +40,7 @@ aphelion-macros = { workspace = true }
 burn = { workspace = true, optional = true }
 cubecl = { workspace = true, optional = true }
 rust-ai-core = { workspace = true, optional = true }
+trit-vsa = { workspace = true, optional = true }
 candle-core = { workspace = true, optional = true }
 half = { workspace = true, optional = true }
 

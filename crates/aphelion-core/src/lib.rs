@@ -130,10 +130,13 @@ pub use rust_ai_core::placeholder::MemoryTracker;
 #[cfg(feature = "rust-ai-core")]
 pub use rust_ai_core::real::{
     bytes_per_element, estimate_attention_memory, estimate_tensor_bytes, get_device, init_logging,
-    is_floating_point, warn_if_cpu, DType, DTypeExt, Dequantize, Device, DeviceConfig,
-    GpuDispatchable, LogConfig, PrecisionMode, Quantize, Tensor, ValidatableConfig,
-    DEFAULT_OVERHEAD_FACTOR, RAC_VERSION,
+    is_floating_point, warn_if_cpu, DType, DTypeExt, Dequantize, Device, DeviceConfig, LogConfig,
+    PrecisionMode, Quantize, Tensor, ValidatableConfig, DEFAULT_OVERHEAD_FACTOR, RAC_VERSION,
 };
+
+// Re-export GPU types from trit-vsa (requires cuda feature)
+#[cfg(all(feature = "rust-ai-core", feature = "cuda"))]
+pub use trit_vsa::gpu::{GpuDispatchable, GpuError, GpuResult};
 
 // Re-export CubeCL types when both features enabled
 #[cfg(all(feature = "rust-ai-core", feature = "cuda"))]

@@ -8,7 +8,7 @@ Fully integrate the `rust-ai-core` crate (https://github.com/tzervas/rust-ai-cor
 - **rust-ai-core**: Foundation crate providing device management, memory tracking, dtype utilities, CubeCL↔Candle interop, and GPU dispatch traits
 - **Current state**: `crates/aphelion-core/src/rust_ai_core.rs` has ~1000 lines of placeholder types (RacDevice, RacModelConfig, etc.)
 
-## rust-ai-core Public API (v0.2.0)
+## rust-ai-core Public API (v0.3.4)
 
 ```rust
 // Device management
@@ -23,8 +23,8 @@ pub use dtype::{bytes_per_element, is_floating_point, DTypeExt, PrecisionMode};
 // Error types
 pub use error::{CoreError, Result};
 
-// Traits
-pub use traits::{ValidatableConfig, Quantize, Dequantize, GpuDispatchable};
+// Traits (GpuDispatchable moved to trit-vsa)
+pub use traits::{ValidatableConfig, Quantize, Dequantize};
 
 // CubeCL interop (requires "cuda" feature)
 #[cfg(feature = "cuda")]
@@ -36,7 +36,15 @@ pub use cubecl::{
 // Logging
 pub use logging::{init_logging, LogConfig};
 
-pub const VERSION: &str = "0.2.0";
+pub const VERSION: &str = "0.3.4";
+```
+
+## trit-vsa GPU Types (v0.3.0)
+
+```rust
+// GPU dispatch types (requires "cuda" feature)
+#[cfg(feature = "cuda")]
+pub use trit_vsa::gpu::{GpuDispatchable, GpuError, GpuResult};
 ```
 
 ## Implementation Steps
@@ -103,20 +111,24 @@ pub mod real {
         dtype::PrecisionMode,
         // Error
         CoreError, Result as RacResult,
-        // Traits
-        ValidatableConfig, Quantize, Dequantize, GpuDispatchable,
+        // Traits (GpuDispatchable moved to trit-vsa)
+        ValidatableConfig, Quantize, Dequantize,
         // Logging
         init_logging, LogConfig,
         // Version
         VERSION as RAC_VERSION,
     };
-    
+
     #[cfg(feature = "cuda")]
     pub use rust_ai_core::{
         TensorBuffer, candle_to_cubecl_handle, cubecl_to_candle_tensor,
         allocate_output_buffer, has_cubecl_cuda_support,
     };
-    
+
+    // GPU dispatch types from trit-vsa (requires cuda feature)
+    #[cfg(feature = "cuda")]
+    pub use trit_vsa::gpu::{GpuDispatchable, GpuError, GpuResult};
+
     pub use candle_core::{Device, DType, Tensor};
 }
 
@@ -340,17 +352,18 @@ pub use cubecl::CubeclContext;
 **File: `crates/aphelion-core/src/pipeline.rs`** (add)
 
 ```rust
-#[cfg(feature = "rust-ai-core")]
-use crate::rust_ai_core::GpuDispatchable;
+// GpuDispatchable now requires cuda feature (from trit-vsa)
+#[cfg(all(feature = "rust-ai-core", feature = "cuda"))]
+use trit_vsa::gpu::GpuDispatchable;
 
 /// A pipeline stage that uses GpuDispatchable for automatic GPU/CPU routing
-#[cfg(feature = "rust-ai-core")]
+#[cfg(all(feature = "rust-ai-core", feature = "cuda"))]
 pub struct GpuDispatchStage<Op: GpuDispatchable> {
     name: String,
     operation: Op,
 }
 
-#[cfg(feature = "rust-ai-core")]
+#[cfg(all(feature = "rust-ai-core", feature = "cuda"))]
 impl<Op: GpuDispatchable> GpuDispatchStage<Op> {
     pub fn new(name: impl Into<String>, operation: Op) -> Self {
         Self {
@@ -360,14 +373,14 @@ impl<Op: GpuDispatchable> GpuDispatchStage<Op> {
     }
 }
 
-#[cfg(feature = "rust-ai-core")]
-impl<Op: GpuDispatchable<Input = BuildGraph, Output = BuildGraph>> PipelineStage 
-    for GpuDispatchStage<Op> 
+#[cfg(all(feature = "rust-ai-core", feature = "cuda"))]
+impl<Op: GpuDispatchable<Input = BuildGraph, Output = BuildGraph>> PipelineStage
+    for GpuDispatchStage<Op>
 {
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn execute(&self, ctx: &BuildContext<'_>, graph: &mut BuildGraph) -> AphelionResult<()> {
         use crate::rust_ai_core::AphelionDevice;
         
@@ -665,19 +678,23 @@ pub mod rust_ai_core;
 pub use rust_ai_core::{
     // Device
     AphelionDevice, DeviceConfig, get_device, warn_if_cpu,
-    // Memory  
+    // Memory
     MemoryTracker, estimate_tensor_bytes,
     // DType
     DTypeExt, bytes_per_element, is_floating_point, PrecisionMode,
-    // Traits
-    ValidatableConfig, Quantize, Dequantize, GpuDispatchable,
+    // Traits (GpuDispatchable moved to trit-vsa)
+    ValidatableConfig, Quantize, Dequantize,
     // Candle types
     Device, DType, Tensor,
 };
 
+// GPU dispatch types from trit-vsa (requires cuda feature)
+#[cfg(all(feature = "rust-ai-core", feature = "cuda"))]
+pub use trit_vsa::gpu::{GpuDispatchable, GpuError, GpuResult};
+
 #[cfg(all(feature = "rust-ai-core", feature = "cuda"))]
 pub use rust_ai_core::cubecl::{
-    CubeclContext, TensorBuffer, 
+    CubeclContext, TensorBuffer,
     candle_to_cubecl_handle, cubecl_to_candle_tensor,
     allocate_output_buffer, has_cubecl_cuda_support,
 };
