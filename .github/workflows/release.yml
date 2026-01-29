@@ -241,3 +241,70 @@ jobs:
         with:
           skip-existing: true
           verbose: true
+
+  # Build WASM package for npm
+  build-wasm:
+    name: Build WASM package
+    needs: validate-publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
+      - name: Build WASM (bundler target)
+        working-directory: crates/aphelion-core
+        run: wasm-pack build --target bundler --out-dir pkg --features wasm
+
+      - name: List package contents
+        run: |
+          echo "=== WASM package files ==="
+          ls -lah crates/aphelion-core/pkg/
+
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-pkg
+          path: crates/aphelion-core/pkg/
+          if-no-files-found: error
+
+  # Publish to npm
+  publish-npm:
+    name: Publish to npm
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download WASM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-pkg
+          path: pkg
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: List package contents
+        run: |
+          echo "=== Package files ==="
+          ls -lah pkg/
+          echo "=== package.json ==="
+          cat pkg/package.json
+
+      - name: Publish to npm
+        working-directory: pkg
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

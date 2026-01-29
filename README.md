@@ -5,6 +5,7 @@
 [![crates.io](https://img.shields.io/crates/v/aphelion-core.svg)](https://crates.io/crates/aphelion-core)
 [![docs.rs](https://docs.rs/aphelion-core/badge.svg)](https://docs.rs/aphelion-core)
 [![PyPI](https://img.shields.io/pypi/v/aphelion-framework.svg)](https://pypi.org/project/aphelion-framework/)
+[![npm](https://img.shields.io/npm/v/aphelion-framework.svg)](https://www.npmjs.com/package/aphelion-framework)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![MSRV](https://img.shields.io/badge/MSRV-1.92-blue.svg)](https://blog.rust-lang.org/)
 
@@ -361,6 +362,8 @@ aphelion-core = { version = "1.2", features = ["rust-ai-core", "tritter-accel", 
 | `burn` | Burn deep learning framework backend |
 | `cubecl` | CubeCL GPU compute backend |
 | `tokio` | Async pipeline execution support |
+| `python` | Python bindings via PyO3 |
+| `wasm` | WebAssembly/TypeScript bindings via wasm-bindgen |
 
 ### Python
 
@@ -390,6 +393,60 @@ pipeline = aphelion.BuildPipeline.standard()
 result = pipeline.execute(ctx, graph)
 
 print(f"Hash: {result.stable_hash()}")
+```
+
+### TypeScript / JavaScript
+
+```bash
+npm install aphelion-framework
+```
+
+The npm package provides WebAssembly bindings that work in both browsers and Node.js environments.
+
+TypeScript/JavaScript usage:
+
+```typescript
+import init, {
+  ModelConfig,
+  BuildGraph,
+  BuildPipeline,
+  BuildContext,
+  getVersion
+} from 'aphelion-framework';
+
+// Initialize WASM module
+await init();
+
+console.log(`Aphelion v${getVersion()}`);
+
+// Build configuration
+const config = new ModelConfig("transformer", "1.0.0");
+const configWithParams = config
+  .withParam("d_model", 512)
+  .withParam("n_heads", 8);
+
+// Build graph
+const graph = new BuildGraph();
+const nodeId = graph.addNode("encoder", configWithParams);
+
+// Execute pipeline
+const ctx = BuildContext.withNullBackend();
+const pipeline = BuildPipeline.standard();
+const result = pipeline.execute(ctx, graph);
+
+console.log(`Hash: ${result.stableHash()}`);
+console.log(`Nodes: ${result.nodeCount()}`);
+```
+
+For Node.js CommonJS:
+
+```javascript
+const aphelion = require('aphelion-framework');
+
+aphelion.default().then(() => {
+  const config = new aphelion.ModelConfig("model", "1.0.0");
+  // ... rest of usage
+});
 ```
 
 ## Core Concepts
@@ -612,7 +669,10 @@ if let Some(source) = error.source() {
 ```
 aphelion-framework-rs/
 ├── crates/
-│   ├── aphelion-core/      # Core library: graphs, pipelines, backends, Python bindings
+│   ├── aphelion-core/      # Core library: graphs, pipelines, backends, Python/WASM bindings
+│   │   └── src/
+│   │       ├── python/     # Python bindings (--features python)
+│   │       └── wasm/       # TypeScript/WASM bindings (--features wasm)
 │   ├── aphelion-macros/    # Proc macros: #[aphelion_model]
 │   ├── aphelion-tests/     # Integration tests
 │   └── aphelion-examples/  # Usage examples
@@ -622,7 +682,8 @@ aphelion-framework-rs/
 └── SPEC.md                 # Success criteria and compliance
 ```
 
-Python bindings are built from `aphelion-core` with the `python` feature enabled.
+- Python bindings are built from `aphelion-core` with the `python` feature enabled.
+- TypeScript/WASM bindings are built from `aphelion-core` with the `wasm` feature using wasm-pack.
 
 ## Testing
 
@@ -692,6 +753,7 @@ Example output from tritter_demo:
 
 | Version | Features |
 |---------|----------|
+| 1.2.9 | TypeScript/WASM bindings via wasm-bindgen (`wasm` feature), npm package |
 | 1.2.8 | Unified Python bindings into aphelion-core (`python` feature), rust-ai-core 0.3.1, candle-core 0.9.2 |
 | 1.2.7 | Dependency updates: rust-ai-core 0.3.1, tritter-accel 0.1.3 with pyo3 0.27.2 compatibility |
 | 1.2.6 | Fix: Python package now uses dynamic versioning from Cargo.toml |

@@ -52,6 +52,8 @@
 //! | `cuda` | Enables CUDA support (requires `rust-ai-core`) |
 //! | `tokio` | Enables async pipeline execution |
 //! | `tritter-accel` | Enables Tritter hardware acceleration |
+//! | `python` | Enables Python bindings via PyO3 |
+//! | `wasm` | Enables WebAssembly/TypeScript bindings via wasm-bindgen |
 //!
 //! ## Quick Start
 //!
@@ -100,6 +102,9 @@ pub mod tritter_backend;
 
 #[cfg(feature = "python")]
 pub mod python;
+
+#[cfg(feature = "wasm")]
+pub mod wasm;
 
 pub use aphelion_macros::aphelion_model;
 

@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.9] - 2026-01-28
+
+### Added
+- **TypeScript/WASM bindings**: New `wasm` feature providing WebAssembly bindings via wasm-bindgen
+- npm package `aphelion-framework` for browser and Node.js usage
+- WASM bindings for all core types:
+  - `ModelConfig` with JSON serialization and presets
+  - `BuildGraph`, `GraphNode`, `NodeId` with stable hashing
+  - `BuildPipeline`, `BuildContext` for pipeline execution
+  - `NullBackend`, `DeviceCapabilities` for backend abstraction
+  - `TraceEvent`, `InMemoryTraceSink`, `TraceLevel` for diagnostics
+  - `ValidationError`, `NameValidator`, `VersionValidator`, `CompositeValidator`
+- Feature detection: `getVersion()`, `hasBurn()`, `hasCubecl()`, `hasRustAiCore()`
+- Automatic panic hook for better error messages in development
+
+### Changed
+- Updated CI/release workflow with WASM build and npm publish jobs
+- Updated README with TypeScript/JavaScript usage examples
+- Updated feature flags documentation
+
+### Usage
+```typescript
+import init, { ModelConfig, BuildGraph } from 'aphelion-framework';
+
+await init();
+const config = new ModelConfig("model", "1.0.0");
+const graph = new BuildGraph();
+graph.addNode("encoder", config);
+console.log(graph.stableHash());
+```
+
 ## [1.2.8] - 2026-01-29
 
 ### Changed
