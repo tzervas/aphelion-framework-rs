@@ -167,8 +167,12 @@ pub mod real {
     // Re-export Error types
     pub use rust_ai_core::{CoreError, Result as RacResult};
 
-    // Re-export Traits
-    pub use rust_ai_core::{Dequantize, GpuDispatchable, Quantize, ValidatableConfig};
+    // Re-export Traits (GpuDispatchable moved to trit_vsa::gpu)
+    pub use rust_ai_core::{Dequantize, Quantize, ValidatableConfig};
+
+    // GPU dispatch types from trit-vsa (requires cuda feature)
+    #[cfg(feature = "cuda")]
+    pub use trit_vsa::gpu::{GpuDispatchable, GpuError, GpuResult};
 
     // Re-export Logging
     pub use rust_ai_core::{init_logging, LogConfig};

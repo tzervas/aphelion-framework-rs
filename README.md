@@ -65,13 +65,13 @@ Aphelion is built on the **rust-ai ecosystem**, a collection of crates providing
 
 ### Core Foundation: rust-ai-core
 
-[**rust-ai-core**](https://github.com/tzervas/rust-ai-core) (v0.3.1) is the shared foundation layer providing:
+[**rust-ai-core**](https://github.com/tzervas/rust-ai-core) (v0.3.4) is the shared foundation layer providing:
 
 - **CUDA-first device selection**: Automatic GPU detection with environment variable overrides
 - **Memory tracking**: Budget allocation and peak usage monitoring for GPU memory
 - **DType utilities**: Bytes per element, floating-point detection, accumulator types
 - **CubeCL interop**: Seamless Candle ↔ CubeCL tensor conversion
-- **Common traits**: `ValidatableConfig`, `Quantize`, `Dequantize`, `GpuDispatchable`
+- **Common traits**: `ValidatableConfig`, `Quantize`, `Dequantize` (GPU traits via trit-vsa)
 - **Unified errors**: `CoreError` hierarchy shared across all rust-ai crates
 
 ```bash
@@ -115,7 +115,7 @@ recovered = decompress_gradients_vsa(compressed, original_shape)
 | Crate | Version | Purpose | Repository |
 |-------|---------|---------|------------|
 | [bitnet-quantize](https://crates.io/crates/bitnet-quantize) | 0.1.1 | Microsoft BitNet b1.58 quantization | [rust-ai](https://github.com/tzervas/rust-ai) |
-| [trit-vsa](https://crates.io/crates/trit-vsa) | 0.1.1 | Balanced ternary arithmetic & VSA ops | [rust-ai](https://github.com/tzervas/rust-ai) |
+| [trit-vsa](https://crates.io/crates/trit-vsa) | 0.3.0 | Balanced ternary arithmetic, VSA ops, GPU dispatch | [rust-ai](https://github.com/tzervas/rust-ai) |
 | [vsa-optim-rs](https://crates.io/crates/vsa-optim-rs) | 0.1.1 | Deterministic training optimization | [rust-ai](https://github.com/tzervas/rust-ai) |
 | [peft-rs](https://crates.io/crates/peft-rs) | 1.0.1 | LoRA, DoRA, AdaLoRA adapters | [rust-ai](https://github.com/tzervas/rust-ai) |
 | [axolotl-rs](https://crates.io/crates/axolotl-rs) | 1.1.1 | YAML-driven LLM fine-tuning | [rust-ai](https://github.com/tzervas/rust-ai) |
@@ -753,6 +753,7 @@ Example output from tritter_demo:
 
 | Version | Features |
 |---------|----------|
+| 1.2.10 | GPU types migration: `GpuDispatchable`/`GpuError`/`GpuResult` now from trit-vsa 0.3.0 (`cuda` feature), rust-ai-core 0.3.4 |
 | 1.2.9 | TypeScript/WASM bindings via wasm-bindgen (`wasm` feature), npm package |
 | 1.2.8 | Unified Python bindings into aphelion-core (`python` feature), rust-ai-core 0.3.1, candle-core 0.9.2 |
 | 1.2.7 | Dependency updates: rust-ai-core 0.3.1, tritter-accel 0.1.3 with pyo3 0.27.2 compatibility |
