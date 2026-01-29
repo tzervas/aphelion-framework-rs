@@ -63,7 +63,7 @@ jobs:
           }' > cargo-audit-results.sarif || echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","runs":[{"tool":{"driver":{"name":"cargo-audit"}},"results":[]}]}' > cargo-audit-results.sarif
 
       - name: Upload SARIF to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: cargo-audit-results.sarif
           category: cargo-audit
