@@ -1,6 +1,17 @@
 # Aphelion Framework
 
+[![CI](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/ci.yml)
+[![Security Audit](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/security.yml/badge.svg)](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/security.yml)
+[![crates.io](https://img.shields.io/crates/v/aphelion-core.svg)](https://crates.io/crates/aphelion-core)
+[![docs.rs](https://docs.rs/aphelion-core/badge.svg)](https://docs.rs/aphelion-core)
+[![PyPI](https://img.shields.io/pypi/v/aphelion-framework.svg)](https://pypi.org/project/aphelion-framework/)
+[![npm](https://img.shields.io/npm/v/aphelion-framework.svg)](https://www.npmjs.com/package/aphelion-framework)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![MSRV](https://img.shields.io/badge/MSRV-1.92-blue.svg)](https://blog.rust-lang.org/)
+
 A unified frontend for AI model development in Rust.
+
+> **Security Note**: This project uses maintained forks (`qlora-paste`, `qlora-gemm`, `qlora-candle`) to replace unmaintained transitive dependencies. See [SECURITY.md](SECURITY.md#unmaintained-dependency-mitigation) for details. Upstream PR: [huggingface/candle#3335](https://github.com/huggingface/candle/pull/3335)
 
 ## Overview
 
@@ -54,7 +65,7 @@ Aphelion is built on the **rust-ai ecosystem**, a collection of crates providing
 
 ### Core Foundation: rust-ai-core
 
-[**rust-ai-core**](https://github.com/tzervas/rust-ai-core) (v0.2.7) is the shared foundation layer providing:
+[**rust-ai-core**](https://github.com/tzervas/rust-ai-core) (v0.3.1) is the shared foundation layer providing:
 
 - **CUDA-first device selection**: Automatic GPU detection with environment variable overrides
 - **Memory tracking**: Budget allocation and peak usage monitoring for GPU memory
@@ -73,7 +84,7 @@ pip install rust-ai-core-bindings
 
 ### Ternary Acceleration: tritter-accel
 
-[**tritter-accel**](https://github.com/tzervas/rust-ai) (v0.1.1) provides BitNet b1.58 ternary operations and VSA gradient compression:
+[**tritter-accel**](https://github.com/tzervas/rust-ai) (v0.1.3) provides BitNet b1.58 ternary operations and VSA gradient compression:
 
 - **Ternary weight packing**: 2-bit per trit storage (4x memory reduction from f32)
 - **Ternary matmul**: Addition-only arithmetic (2-4x speedup)
@@ -351,6 +362,8 @@ aphelion-core = { version = "1.2", features = ["rust-ai-core", "tritter-accel", 
 | `burn` | Burn deep learning framework backend |
 | `cubecl` | CubeCL GPU compute backend |
 | `tokio` | Async pipeline execution support |
+| `python` | Python bindings via PyO3 |
+| `wasm` | WebAssembly/TypeScript bindings via wasm-bindgen |
 
 ### Python
 
@@ -358,11 +371,7 @@ aphelion-core = { version = "1.2", features = ["rust-ai-core", "tritter-accel", 
 pip install aphelion-framework
 ```
 
-For memory tracking and device detection:
-
-```bash
-pip install aphelion-framework rust-ai-core-bindings
-```
+The package includes all core features. Memory tracking and device detection are available when the wheel is built with `rust-ai-core` feature.
 
 Python usage:
 
@@ -384,6 +393,60 @@ pipeline = aphelion.BuildPipeline.standard()
 result = pipeline.execute(ctx, graph)
 
 print(f"Hash: {result.stable_hash()}")
+```
+
+### TypeScript / JavaScript
+
+```bash
+npm install aphelion-framework
+```
+
+The npm package provides WebAssembly bindings that work in both browsers and Node.js environments.
+
+TypeScript/JavaScript usage:
+
+```typescript
+import init, {
+  ModelConfig,
+  BuildGraph,
+  BuildPipeline,
+  BuildContext,
+  getVersion
+} from 'aphelion-framework';
+
+// Initialize WASM module
+await init();
+
+console.log(`Aphelion v${getVersion()}`);
+
+// Build configuration
+const config = new ModelConfig("transformer", "1.0.0");
+const configWithParams = config
+  .withParam("d_model", 512)
+  .withParam("n_heads", 8);
+
+// Build graph
+const graph = new BuildGraph();
+const nodeId = graph.addNode("encoder", configWithParams);
+
+// Execute pipeline
+const ctx = BuildContext.withNullBackend();
+const pipeline = BuildPipeline.standard();
+const result = pipeline.execute(ctx, graph);
+
+console.log(`Hash: ${result.stableHash()}`);
+console.log(`Nodes: ${result.nodeCount()}`);
+```
+
+For Node.js CommonJS:
+
+```javascript
+const aphelion = require('aphelion-framework');
+
+aphelion.default().then(() => {
+  const config = new aphelion.ModelConfig("model", "1.0.0");
+  // ... rest of usage
+});
 ```
 
 ## Core Concepts
@@ -606,9 +669,11 @@ if let Some(source) = error.source() {
 ```
 aphelion-framework-rs/
 ├── crates/
-│   ├── aphelion-core/      # Core library: graphs, pipelines, backends
+│   ├── aphelion-core/      # Core library: graphs, pipelines, backends, Python/WASM bindings
+│   │   └── src/
+│   │       ├── python/     # Python bindings (--features python)
+│   │       └── wasm/       # TypeScript/WASM bindings (--features wasm)
 │   ├── aphelion-macros/    # Proc macros: #[aphelion_model]
-│   ├── aphelion-python/    # Python bindings via PyO3
 │   ├── aphelion-tests/     # Integration tests
 │   └── aphelion-examples/  # Usage examples
 ├── docs/
@@ -616,6 +681,9 @@ aphelion-framework-rs/
 │   └── API-GUIDE.md        # Usage patterns with examples
 └── SPEC.md                 # Success criteria and compliance
 ```
+
+- Python bindings are built from `aphelion-core` with the `python` feature enabled.
+- TypeScript/WASM bindings are built from `aphelion-core` with the `wasm` feature using wasm-pack.
 
 ## Testing
 
@@ -685,6 +753,13 @@ Example output from tritter_demo:
 
 | Version | Features |
 |---------|----------|
+| 1.2.9 | TypeScript/WASM bindings via wasm-bindgen (`wasm` feature), npm package |
+| 1.2.8 | Unified Python bindings into aphelion-core (`python` feature), rust-ai-core 0.3.1, candle-core 0.9.2 |
+| 1.2.7 | Dependency updates: rust-ai-core 0.3.1, tritter-accel 0.1.3 with pyo3 0.27.2 compatibility |
+| 1.2.6 | Fix: Python package now uses dynamic versioning from Cargo.toml |
+| 1.2.5 | Dependency updates: burn 0.20.1, pyo3 0.27.2, thiserror 2.0.18, half 2.7.1 |
+| 1.2.4 | Security: Replaced unmaintained `paste`/`gemm` with maintained forks. See [SECURITY.md](SECURITY.md#unmaintained-dependency-mitigation) |
+| 1.2.3 | Documentation updates for dependency tracking |
 | 1.2.2 | tritter-accel integration, enhanced documentation |
 | 1.2.1 | rust-ai-core v0.2.6 integration, Python bindings, memory tracking |
 | 1.1.0 | Typed params, preset pipelines, async execution, backend auto-detect |

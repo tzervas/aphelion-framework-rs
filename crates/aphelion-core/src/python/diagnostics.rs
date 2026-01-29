@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use aphelion_core::diagnostics::{InMemoryTraceSink, TraceEvent, TraceLevel, TraceSink};
+use crate::diagnostics::{InMemoryTraceSink, TraceEvent, TraceLevel, TraceSink};
 
 /// Severity level for trace events.
 ///

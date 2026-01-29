@@ -1,0 +1,59 @@
+# cargo-deny configuration
+# https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Scope: "all" (all crates), "workspace" (only workspace crates), "none" (disabled)
+ignore = [
+    # bincode unmaintained - used by burn-core, monitor for alternatives
+    "RUSTSEC-2025-0141",
+    # paste unmaintained - used by tracel-mlir-rs via cubecl
+    # TODO: Replace with [patch] once qlora-paste patch-target branch is created
+    # See: https://github.com/tzervas/qlora-paste
+    "RUSTSEC-2024-0436",
+    # lru unsound (IterMut) - used by ratatui via burn-train
+    # Low risk: only affects IterMut usage pattern, not typical LRU cache ops
+    "RUSTSEC-2026-0002",
+]
+
+[licenses]
+# Scope for license checks
+confidence-threshold = 0.8
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "Zlib",
+    "CC0-1.0",
+    "MPL-2.0",
+    "BSL-1.0",
+]
+
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+
+# Skip checking certain crates for multiple versions
+skip = []
+
+# Skip checking tree for certain crates
+skip-tree = []
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

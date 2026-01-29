@@ -16,10 +16,14 @@ default = []
 # Ecosystem integrations
 burn = ["dep:burn"]
 cubecl = ["dep:cubecl"]
-rust-ai-core = ["dep:rust-ai-core", "dep:candle-core"]
+rust-ai-core = ["dep:rust-ai-core", "dep:candle-core", "dep:half"]
 cuda = ["rust-ai-core", "rust-ai-core/cuda"]
 tritter-accel = []
 tokio = ["dep:tokio"]
+# Python bindings (for building wheels with maturin)
+python = ["dep:pyo3", "dep:pythonize", "dep:pyo3-async-runtimes", "tokio"]
+# WASM/TypeScript bindings (for npm package via wasm-pack)
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook"]
 
 [dependencies]
 serde = { workspace = true }
@@ -37,3 +41,19 @@ burn = { workspace = true, optional = true }
 cubecl = { workspace = true, optional = true }
 rust-ai-core = { workspace = true, optional = true }
 candle-core = { workspace = true, optional = true }
+half = { workspace = true, optional = true }
+
+# Python bindings (optional, for building wheels)
+pyo3 = { workspace = true, optional = true, features = ["extension-module", "abi3-py310"] }
+pyo3-async-runtimes = { workspace = true, optional = true, features = ["tokio-runtime"] }
+pythonize = { workspace = true, optional = true }
+
+# WASM/TypeScript bindings (optional, for npm package)
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
+console_error_panic_hook = { workspace = true, optional = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]

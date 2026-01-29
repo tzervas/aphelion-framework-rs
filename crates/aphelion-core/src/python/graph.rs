@@ -6,9 +6,9 @@
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
-use aphelion_core::graph::{BuildGraph, GraphNode, NodeId};
+use crate::graph::{BuildGraph, GraphNode, NodeId};
 
-use crate::config::PyModelConfig;
+use super::config::PyModelConfig;
 
 /// Unique identifier for a graph node.
 ///
