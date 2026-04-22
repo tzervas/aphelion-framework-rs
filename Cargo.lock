@@ -5392,9 +5392,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+checksum = "5ca0ecfa931c29007047d1bc58e623ab12e5590e8c7cc53200d5202b69266d8a"
 dependencies = [
  "libc",
  "rand_chacha 0.3.1",
@@ -6473,7 +6473,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "ndarray 0.16.1",
- "rand 0.8.5",
+ "rand 0.8.6",
  "safetensors 0.3.3",
  "thiserror 1.0.69",
  "torch-sys",
@@ -6676,7 +6676,7 @@ dependencies = [
  "monostate",
  "onig",
  "paste",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rayon",
  "rayon-cond",
  "regex",
@@ -7052,7 +7052,7 @@ dependencies = [
  "bitnet-quantize 0.2.1",
  "candle-core",
  "candle-nn",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rand_chacha 0.3.1",
  "thiserror 2.0.18",
  "trit-vsa 0.3.0",
@@ -7359,7 +7359,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05d0b98fa1894ea6bb00593bef245c2e5533da9f32b5716af701a15efdf15257"
 dependencies = [
  "candle-core",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rand_chacha 0.3.1",
  "serde",
  "thiserror 1.0.69",
