@@ -197,25 +197,25 @@ jobs:
         run: mkdir -p dist
 
       - name: Download Ubuntu wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: wheels-ubuntu-latest
           path: dist
 
       - name: Download macOS wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: wheels-macos-latest
           path: dist
 
       - name: Download Windows wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: wheels-windows-latest
           path: dist
 
       - name: Download sdist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: sdist
           path: dist
@@ -285,7 +285,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download WASM artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: wasm-pkg
           path: pkg
