@@ -1,19 +1,7 @@
 name: Security Audit
 
+# Manual only — no push/pull_request CI triggers
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-  pull_request:
-    branches: [main, master]
-    paths:
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-  schedule:
-    # Run weekly on Monday at 00:00 UTC
-    - cron: '0 0 * * 1'
   workflow_dispatch:
 
 permissions:
