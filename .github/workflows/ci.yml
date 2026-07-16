@@ -9,7 +9,7 @@ env:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     strategy:
       matrix:
         rust: [stable, beta]
@@ -50,7 +50,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     strategy:
       matrix:
         rust: [stable, beta]
@@ -82,7 +82,7 @@ jobs:
 
   clippy:
     name: Clippy
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     steps:
       - uses: actions/checkout@v4
 
@@ -107,7 +107,7 @@ jobs:
 
   fmt:
     name: Rustfmt
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     steps:
       - uses: actions/checkout@v4
 
