@@ -1,5 +1,10 @@
 # Aphelion Framework
 
+<!-- FLEET-BADGES:BEGIN -->
+[![CI](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/fleet-ci.yml/badge.svg?branch=main)](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/fleet-ci.yml?query=branch%3Amain)
+[![Security](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/fleet-security.yml/badge.svg?branch=main)](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/fleet-security.yml?query=branch%3Amain)
+<!-- FLEET-BADGES:END -->
+
 [![CI](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/ci.yml)
 [![Security Audit](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/security.yml/badge.svg)](https://github.com/tzervas/aphelion-framework-rs/actions/workflows/security.yml)
 [![crates.io](https://img.shields.io/crates/v/aphelion-core.svg)](https://crates.io/crates/aphelion-core)
