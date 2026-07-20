@@ -36,7 +36,7 @@ proc-macro2 = "1"
 qlora-paste = "1.0.20"
 
 # Ecosystem dependencies (feature-gated)
-burn = "0.20.1"
+burn = "0.21.0"
 cubecl = "0.9"
 rust-ai-core = "0.3.4"
 trit-vsa = "0.3.0"
