@@ -37,7 +37,7 @@ qlora-paste = "1.0.20"
 
 # Ecosystem dependencies (feature-gated)
 burn = "0.20.1"
-cubecl = "0.9"
+cubecl = "0.10"
 rust-ai-core = "0.3.4"
 trit-vsa = "0.3.0"
 candle-core = "0.9.2"
