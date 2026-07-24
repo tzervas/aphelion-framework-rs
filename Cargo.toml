@@ -33,7 +33,7 @@ tokio = { version = "1", features = ["rt", "macros", "time"] }
 syn = { version = "2", features = ["full", "extra-traits"] }
 quote = "1"
 proc-macro2 = "1"
-qlora-paste = "1.0.20"
+qlora-paste = "1.0.21"
 
 # Ecosystem dependencies (feature-gated)
 burn = "0.20.1"
@@ -61,7 +61,7 @@ aphelion-macros = { version = "1.2.10", path = "crates/aphelion-macros" }
 aphelion-core = { version = "1.2.10", path = "crates/aphelion-core" }
 
 # Patch candle crates with qlora-candle fork using maintained dependencies
-# Dependency chain: candle-core -> qlora-gemm v0.20.0 -> qlora-paste v1.0.20
+# Dependency chain: candle-core -> qlora-gemm v0.20.0 -> qlora-paste v1.0.21
 # PR'd to huggingface/candle for future upstream adoption
 [patch.crates-io]
 candle-core = { git = "https://github.com/tzervas/qlora-candle.git", branch = "use-qlora-gemm" }
