@@ -10,7 +10,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! aphelion-core = { version = "1.1", features = ["cubecl"] }
+//! aphelion-core = { version = "1.2", features = ["cubecl"] }
 //! ```
 //!
 //! # Current Status

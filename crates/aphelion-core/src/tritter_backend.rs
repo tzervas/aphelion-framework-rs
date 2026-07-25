@@ -9,7 +9,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! aphelion-core = { version = "1.1", features = ["tritter-accel"] }
+//! aphelion-core = { version = "1.2", features = ["tritter-accel"] }
 //! ```
 //!
 //! # Acceleration Modes
