@@ -10,7 +10,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! aphelion-core = { version = "1.1", features = ["burn"] }
+//! aphelion-core = { version = "1.2", features = ["burn"] }
 //! ```
 //!
 //! # Current Status

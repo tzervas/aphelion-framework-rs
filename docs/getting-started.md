@@ -73,7 +73,7 @@ Enable additional functionality with feature flags:
 
 ```toml
 [dependencies]
-aphelion-core = { version = "1.0", features = ["tokio"] }
+aphelion-core = { version = "1.2", features = ["tokio"] }
 serde_json = "1.0"
 ```
 
@@ -520,15 +520,15 @@ Aphelion uses feature flags to keep the core library lightweight while allowing 
 ```toml
 # Single feature
 [dependencies]
-aphelion-core = { version = "1.0", features = ["tokio"] }
+aphelion-core = { version = "1.2", features = ["tokio"] }
 
 # Multiple features
 [dependencies]
-aphelion-core = { version = "1.0", features = ["burn", "tokio"] }
+aphelion-core = { version = "1.2", features = ["burn", "tokio"] }
 
 # All features (for development/testing)
 [dependencies]
-aphelion-core = { version = "1.0", features = ["burn", "cubecl", "tokio"] }
+aphelion-core = { version = "1.2", features = ["burn", "cubecl", "tokio"] }
 ```
 
 ### Async Execution (tokio feature)
@@ -762,7 +762,7 @@ use aphelion_core::config::ModelConfig;
 
 ```toml
 [dependencies]
-aphelion-core = { version = "1.0", features = ["tokio"] }
+aphelion-core = { version = "1.2", features = ["tokio"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ```
 

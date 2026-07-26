@@ -705,19 +705,19 @@ aphelion-core = "1.0"
 **With Burn backend:**
 ```toml
 [dependencies]
-aphelion-core = { version = "1.0", features = ["burn"] }
+aphelion-core = { version = "1.2", features = ["burn"] }
 ```
 
 **Multiple backends:**
 ```toml
 [dependencies]
-aphelion-core = { version = "1.0", features = ["burn", "cubecl"] }
+aphelion-core = { version = "1.2", features = ["burn", "cubecl"] }
 ```
 
 **Full featured:**
 ```toml
 [dependencies]
-aphelion-core = { version = "1.0", features = ["burn", "cubecl", "tokio"] }
+aphelion-core = { version = "1.2", features = ["burn", "cubecl", "tokio"] }
 ```
 
 ---
