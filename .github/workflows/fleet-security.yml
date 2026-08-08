@@ -20,7 +20,7 @@ permissions:
 jobs:
   gitleaks:
     name: gitleaks
-    runs-on: [self-hosted, linux, x64, podman]
+    runs-on: [self-hosted, linux, x64, podman, micro]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,7 +41,7 @@ jobs:
 
   trivy-fs:
     name: trivy filesystem (vuln+secret+license)
-    runs-on: [self-hosted, linux, x64, podman]
+    runs-on: [self-hosted, linux, x64, podman, micro]
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
